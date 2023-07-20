@@ -10,19 +10,39 @@ pub const defaultPieceLayout: u256 = 0x23465432_11111111_00000000_00000000_00000
 pub const initialBoard: Board = Board { .layout = defaultPieceLayout };
 const utf8DigitOffset = 48;
 
+/// A general interface for iterators
+/// over the elements of a board.
+const LayoutIterator = union(enum) {
+    ForwardLayoutIterator,
+    ReverseLayoutIterator,
+    FenOrderedLayoutIterator,
+
+    pub fn next(self: *LayoutIterator) ?u4 {
+       return switch (self) {
+           inline else => |iter| iter.next(),
+        };
+    }
+
+    pub fn reset(self: *LayoutIterator) void {
+        switch (self) {
+            inline else => |iter| iter.reset(),
+        }
+    }
+};
+
 /// Provides an in-order iterator over the given board layout,
 /// from 0 to 63 (252).
-const LayoutIterator = struct {
+const ForwardLayoutIterator = struct {
     index: i16 = -4,
     layout: *const u256,
 
-    pub fn next(self: *LayoutIterator) ?u4 {
+    pub fn next(self: *ForwardLayoutIterator) ?u4 {
         if (self.index == 252) return null;
         self.index += 4;
         return @intCast(u4, 0b1111 & (self.layout.* >> @intCast(u8, self.index)));
     }
 
-    pub fn reset(self: *LayoutIterator) void {
+    pub fn reset(self: *ForwardLayoutIterator) void {
         self.index = -4;
     }
 };
@@ -102,8 +122,8 @@ pub const Board = packed struct {
     }
 
     /// Returns a new LayoutIterator over the board's layout.
-    pub fn layoutIterator(self: *const Board) LayoutIterator {
-        return LayoutIterator{ .layout = &self.layout};
+    pub fn forwardLayoutIterator(self: *const Board) ForwardLayoutIterator {
+        return ForwardLayoutIterator{ .layout = &self.layout};
     }
 
     /// Returns a new ReverseLayoutIterator over the board's layout.
@@ -181,15 +201,15 @@ test "board.Board.getPieceAtIndex" {
     try expectEqual(Piece.WHITE_PAWN, piece12);
 }
 
-test "board.Board.layoutIterator on initialState" {
-    var layoutIterator = initialBoard.layoutIterator();
+test "board.Board.forwardLayoutIterator on initialState" {
+    var fli = initialBoard.forwardLayoutIterator();
 
     for (0..13) |_| {
-        _ = layoutIterator.next();
+        _ = fli.next();
     }
 
-    try expectEqual(@as(?u4, 0b1001), layoutIterator.next()); // WHITE_PAWN
-    try expectEqual(@as(?u4, 0b1001), layoutIterator.next()); // WHITE_PAWN
+    try expectEqual(@as(?u4, 0b1001), fli.next()); // WHITE_PAWN
+    try expectEqual(@as(?u4, 0b1001), fli.next()); // WHITE_PAWN
 }
 
 test "board.Board.reverseLayoutIterator on initialState" {
