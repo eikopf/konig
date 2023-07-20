@@ -5,13 +5,17 @@ const piece = @import("piece.zig");
 const mem = std.mem; // for comparing bytes in strings
 const parseInt = std.fmt.parseInt;
 const charToDigit = std.fmt.charToDigit;
+const digitToChar = std.fmt.digitToChar;
+const expect = std.testing.expect;
 const expectEqual = std.testing.expectEqual;
+const expectEqualStrings = std.testing.expectEqualStrings;
 const expectError = std.testing.expectError;
+const Allocator = std.mem.Allocator;
 
-const fenStartingPosition = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+const fenStartingPosition: []const u8 = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 const validCastlingPermissions = [16][]const u8{"-", "K", "Q", "k", "q", "KQ", "Kk", "Kq", "Qk", "Qq", "kq", "KQk", "KQq", "Kkq", "Qkq", "KQkq"};
 const fileLetters = "abcdefgh";
-const utf8DigitOffset = 48;
+const utf8DigitOffset: u8 = 48;
 
 /// Stores the information parsed from a FEN string
 /// as a 36-byte struct. Ordered as they appear in
@@ -23,7 +27,7 @@ const utf8DigitOffset = 48;
 /// * the en passant target square as an i7 (7 bits), effectively a u6 board index with -1 as a sentinel "null" value;
 /// * the halfmove clock as a u6 (6 bits);
 /// * the fullmove counter as a u14 (14 bits);
-const FenData = packed struct {
+pub const FenData = packed struct {
     board: board.Board,                     // 256 bits (32 bytes)
     sideToMove: piece.PieceColor,           // 1 bit
     castlingPermissions: u4,                // 4 bits
@@ -31,6 +35,175 @@ const FenData = packed struct {
     halfmoveClock: u6 = 0,                  // 6 bits
     fullmoveCounter: u14 = 1,               // 14 bits (sum 288 bits, 36 bytes)
     // fullmoveCounter needs to store at most ~9000 (u14 minimum)
+
+    /// Returns the appropriate FEN string representation
+    /// for this FenData.
+    pub fn toString(self: *const FenData, allocator: Allocator) ![]const u8 {
+        // TODO: refactor to use io.FixedBufferStream for result
+
+        // see https://chess.stackexchange.com/a/30006
+        // for discussion of largest possible FEN string
+        var result = [_]u8{0} ** 90;
+        var writeIndex: u8 = 0;
+
+        // write board component
+        {
+            var foli = self.board.fenOrderedLayoutIterator();
+            var emptySpace: u8 = 0;
+            var rankLength: u8 = 0;
+            while (foli.next()) |code| {
+            switch (@enumFromInt(piece.Piece, code)) {
+                .NONE => {
+                    if (emptySpace == 7) {
+                        result[writeIndex] = '8';
+                        writeIndex += 1;
+                        emptySpace = 0;
+                        rankLength = 8;
+                    } else {
+                        emptySpace += 1;
+                        rankLength += 1;
+                    }
+                },
+
+                else => |pce| {
+                    if (emptySpace > 0) {
+                        result[writeIndex] = emptySpace + utf8DigitOffset;
+                        writeIndex += 1;
+                        rankLength += emptySpace;
+                        emptySpace = 0;
+                    }
+
+                    result[writeIndex] = try pieceToChar(pce);
+                    writeIndex += 1;
+                    rankLength += 1;
+                }
+            }
+
+            // handle end cases
+            if (rankLength == 8) {
+                result[writeIndex] = '/';
+                writeIndex += 1;
+                rankLength = 0;
+            }
+        }
+
+            result[writeIndex-1] = ' '; // remove extra '/'
+        }
+
+        // write side to move component
+        {
+            result[writeIndex] = switch(self.sideToMove) {
+                .WHITE => 'w',
+                .BLACK => 'b',
+            };
+            result[writeIndex+1] = ' ';
+            writeIndex += 2;
+        }
+
+        // write castling permissions component
+        {
+            const permissions = validCastlingPermissions[self.castlingPermissions];
+            for (permissions) |byte| {
+                result[writeIndex] = byte;
+                writeIndex += 1;
+            }
+            result[writeIndex] = ' ';
+            writeIndex += 1;
+        }
+
+        // write en passant target square component
+        {
+            switch(self.enPassantTargetSquare) {
+                -1 => {
+                    result[writeIndex] = '-';
+                    writeIndex += 1;
+                },
+                0...63 => |index| for (board.indexToAlgebraicPosition(@intCast(u6, index))) |byte| {
+                    result[writeIndex] = byte;
+                    writeIndex += 1;
+                },
+                else => return error.InvalidFenDataField,
+            }
+
+            result[writeIndex] = ' ';
+            writeIndex += 1;
+        }
+
+        // write halfmove clock component
+        {
+            var buf = [_]u8{0} ** 2;
+            _ = try std.fmt.bufPrint(&buf, "{d}", .{self.halfmoveClock});
+
+            for (buf) |byte| switch (byte) {
+                '0'...'9' => |char| {
+                    result[writeIndex] = char;
+                    writeIndex += 1;
+                },
+                0 => break,
+                else => return error.InvalidFenDataField,
+            };
+
+            result[writeIndex] = ' ';
+            writeIndex += 1;
+        }
+
+        // write fullmove counter component
+        {
+            var buf = [_]u8{0} ** 2;
+            _ = try std.fmt.bufPrint(&buf, "{d}", .{self.fullmoveCounter});
+
+            for (buf) |byte| switch (byte) {
+                '0'...'9' => |char| {
+                    result[writeIndex] = char;
+                    writeIndex += 1;
+                },
+                0 => break,
+                else => return error.InvalidFenDataField,
+            };
+        }
+
+        // allocate copy on the stack,
+        // such that the caller owns the result
+        const result_copy = try allocator.dupe(u8, result[0..writeIndex]);
+        return result_copy;
+    }
+};
+
+/// Provides a virtual iterator over the indices of a board
+/// as they appear in a FEN string.
+const FenIndexIterator = struct {
+    index: u6 = 55,
+    steps: u8 = 0,
+    rankIndex: u8 = 0,
+
+    pub fn next(self: *FenIndexIterator) ?u6 {
+        if (self.index == 7) return null;
+
+        if (self.rankIndex == 8) {
+            self.index -= 15;
+            self.rankIndex = 1;
+        } else {
+            self.index += 1;
+            self.rankIndex += 1;
+        }
+
+        self.steps += 1;
+        return self.index;
+    }
+
+    pub fn reset(self: *FenIndexIterator) void {
+        self.index = 55;
+        self.rankIndex = 0;
+        self.steps =0;
+    }
+
+    pub fn advance(self: *FenIndexIterator, steps: u6) !void {
+        if (@intCast(u8, self.steps) + steps > 64) return error.InvalidFenIndex;
+
+        for (0..steps) |_| {
+            _ = self.next();
+        }
+    }
 };
 
 /// Parses a complete FEN string into its components, and
@@ -50,8 +223,8 @@ pub fn parseFenString(str: []const u8) !FenData {
 
 /// Parses the "Piece placement" (1st) component of a FEN string.
 fn parsePiecePlacement(str: []const u8) !board.Board {
-    var index: u6 = 56; // fenIndexToBoardIndex(0);
     var layout: u256 = 0;
+    var fii = FenIndexIterator{};
 
     for (str) |byte| {
         switch (byte) {
@@ -60,14 +233,13 @@ fn parsePiecePlacement(str: []const u8) !board.Board {
             'q', 'Q', 'k',
             'K', 'n', 'N' => |pieceByte| {
                 const parsedPiece = try charToPiece(pieceByte);
-                const boardIndex: u8 = @intCast(u8, 63 - fenIndexToBoardIndex(index));
+                const boardIndex: u8 = @intCast(u8, fii.next() orelse return error.InvalidFenStringComponent);
 
                 layout |= @as(u256, @intFromEnum(parsedPiece)) << (4 * boardIndex);
-                if (index != 63 and (index + 1) % 8 != 0) index += 1;
             },
 
-            '/' => index -= 15,
-            '1'...'8' => |fillSpace| index += @intCast(u6, fillSpace - utf8DigitOffset - 1),
+            '/' => continue,
+            '1'...'8' => |fillSpace| try fii.advance(@intCast(u6, fillSpace - utf8DigitOffset)),
             else => return error.InvalidFenStringComponent,
         }
     }
@@ -154,6 +326,26 @@ fn charToPiece(char: u8) !piece.Piece {
     };
 }
 
+/// Converts the given piece.Piece to an appropriate FEN character.
+/// Throws an error for piece.Piece.NONE.
+fn pieceToChar(pce: piece.Piece) !u8 {
+    return switch (pce) {
+        .BLACK_PAWN => 'p',
+        .BLACK_ROOK => 'r',
+        .BLACK_KNIGHT => 'n',
+        .BLACK_BISHOP => 'b',
+        .BLACK_QUEEN => 'q',
+        .BLACK_KING => 'k',
+        .WHITE_PAWN => 'P',
+        .WHITE_ROOK => 'R',
+        .WHITE_KNIGHT => 'N',
+        .WHITE_BISHOP => 'B',
+        .WHITE_QUEEN => 'Q',
+        .WHITE_KING => 'K',
+        else => error.InvalidFenStringComponent,
+    };
+}
+
 /// Converts the index of a position on a FEN string
 /// board representation into an index in the engine's
 /// internal representation.
@@ -193,6 +385,15 @@ test "parsing initial gamestate into FenData" {
     try expectEqual(@as(u14, 1), initialState.fullmoveCounter);
 }
 
+test "converting initial position FenData to FEN string" {
+    var buf: [100]u8 = undefined;
+    var fba = std.heap.FixedBufferAllocator.init(&buf);
+    const allocator = fba.allocator();
+    const initialState: FenData = try parseFenString(fenStartingPosition);
+    const result = try initialState.toString(allocator);
+    try expectEqualStrings(fenStartingPosition, result);
+}
+
 test "fen.fenIndexToBoardIndex" {
     var arr: [64]u6 = undefined;
 
@@ -216,4 +417,10 @@ test "fen.fenIndexToBoardIndex is its own inverse" {
     for(0..64) |i| {
         try expectEqual(@intCast(u6, i), fenIndexToBoardIndex(fenIndexToBoardIndex(@intCast(u6, i))));
     }
+}
+
+test "fen.FenIndexIterator.next" {
+    var fii = FenIndexIterator{};
+    try expectEqual(@as(?u6, 56), fii.next());
+
 }
