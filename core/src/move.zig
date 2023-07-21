@@ -1,7 +1,3 @@
-//! Provides the essential components and definitions for moves and move validation.
-//!
-//! This module explicitly *does not* provide utilities for move generation or evalution.
-
 const std = @import("std");
 const piece = @import("piece.zig");
 
@@ -28,7 +24,7 @@ const MoveFlag = enum(u4) {
     _,
 };
 
-/// A 16 bit struct representing a move, with additional metadata.
+/// A 2-byte struct representing a move, with additional metadata.
 pub const Move = packed struct {
     source: u6,
     target: u6,

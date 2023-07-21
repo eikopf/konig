@@ -38,7 +38,7 @@ pub const FenData = packed struct {
 
     /// Returns the appropriate FEN string representation
     /// for this FenData.
-    pub fn toString(self: *const FenData, allocator: Allocator) ![]const u8 {
+    pub fn toString(self: *const FenData, allocator: *Allocator) ![]const u8 {
         // TODO: refactor to use io.FixedBufferStream for result
 
         // see https://chess.stackexchange.com/a/30006
@@ -388,9 +388,9 @@ test "parsing initial gamestate into FenData" {
 test "converting initial position FenData to FEN string" {
     var buf: [100]u8 = undefined;
     var fba = std.heap.FixedBufferAllocator.init(&buf);
-    const allocator = fba.allocator();
+    var allocator = fba.allocator();
     const initialState: FenData = try parseFenString(fenStartingPosition);
-    const result = try initialState.toString(allocator);
+    const result = try initialState.toString(&allocator);
     try expectEqualStrings(fenStartingPosition, result);
 }
 
