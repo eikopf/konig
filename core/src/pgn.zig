@@ -161,7 +161,8 @@
 // - A formal PGN file grammar is provided in section 18 of the spec.
 
 const std = @import("std");
-const move = @import("move");
+const move = @import("move.zig");
+const fen = @import("fen.zig");
 
 const mem = std.mem;
 const Allocator = std.mem.Allocator;
@@ -170,12 +171,32 @@ const expectEqual = std.testing.expectEqual;
 const expectEqualDeep = std.testing.expectEqualDeep;
 const expectError = std.testing.expectError;
 
+/// A simple 3-component date
+/// struct for storing parsed
+/// dates from PGN data.
+const Date = struct {
+    year: ?u16,
+    month: ?u8,
+    day: ?u8,
+};
+
+/// A simple 3-component time
+/// struct for storing parsed
+/// time from PGN data.
+const Time = struct {
+    hour: u8,
+    minute: u8,
+    second: u8,
+};
+
 const PgnError = error {
     InvalidDataFormat,
     InvalidStringLiteral,
     InvalidNumericAnnotationGlyph,
 };
 
+/// A tag type used by the
+/// Token union.
 const TokenTag = enum {
     WHITESPACE,
     STRING,
@@ -192,6 +213,8 @@ const TokenTag = enum {
     NUMERIC_ANNOTATION_GLYPH,
 };
 
+/// A PGN token associated with the
+/// appropriate data type.
 const Token = union(TokenTag) {
     WHITESPACE: void,
     PERIOD: void,
@@ -214,11 +237,13 @@ const Token = union(TokenTag) {
     }
 };
 
+/// Provides an iterator over a []u8 source,
+/// which repeatedly advances over it and
+/// returns valid PGN tokens.
 const TokenIterator = struct {
-    allocator: Allocator,
+    allocator: *Allocator,
     source: []const u8,
     index: usize = 0,
-    previous: ?Token = null,
 
     pub fn next(self: *TokenIterator) !?Token {
         defer self.index += 1;
@@ -246,9 +271,9 @@ const TokenIterator = struct {
         };
     }
 
-    // TODO: implement pub fn peek() !?Token
-    // TODO: implement pub fn previous() ?Token (presumably the last token didn't error)
-    // TODO: implement pub fn reset() void
+    pub fn reset(self: *TokenIterator) void {
+        self.index = 0;
+    }
 
     /// Iterates over a whitespace region in the
     /// source and emits a WHITESPACE token when
@@ -274,7 +299,7 @@ const TokenIterator = struct {
     ///
     /// This function assumes that when it is
     /// invoked, source[index] == '"'.
-    fn parseString(self: *TokenIterator, allocator: Allocator) !Token {
+    fn parseString(self: *TokenIterator, allocator: *Allocator) !Token {
         var value: [255]u8 = undefined;
         var writeIndex: u8 = 0;
         var escapeNextChar: bool = false;
@@ -327,7 +352,7 @@ const TokenIterator = struct {
     ///
     /// This function assumes that when it is invoked,
     /// source[index] is an alphanumeric character.
-    fn parseSymbol(self: *TokenIterator, firstChar: u8, allocator: Allocator) !Token {
+    fn parseSymbol(self: *TokenIterator, firstChar: u8, allocator: *Allocator) !Token {
         var value: [255]u8 = undefined; // max symbol length is 255
         value[0] = firstChar;
 
@@ -371,13 +396,19 @@ const TokenIterator = struct {
         };
     }
 
+    /// Iterates over an NAG region in the source
+    /// and emits a NUMERIC_ANNOTATION_GLYPH token
+    /// when complete.
+    ///
+    /// This function assumes that when it is invoked,
+    /// source[index] == '%'.
     fn parseNumericAnnotationGlyph(self: *TokenIterator) !Token {
         // the result will have at most 3 digits
         var parsedResult: [3]u8 = undefined;
         var writeIndex: usize = 0;
 
         while (self.index + 1 < self.source.len) : ({
-            if (writeIndex >= 3) return error.InvalidNumericAnnotationGlyph;
+            if (writeIndex > 3) return error.InvalidNumericAnnotationGlyph;
             self.index += 1;
         }) switch (self.source[self.index + 1]) {
             '0'...'9' => |digit| {
@@ -385,20 +416,144 @@ const TokenIterator = struct {
                 writeIndex += 1;
             },
             else => {
-                const result: u8 = try std.fmt.parseInt(u8, &parsedResult, 10);
+                const result: u8 = try std.fmt.parseInt(u8, parsedResult[0..writeIndex], 10);
                 return .{ .NUMERIC_ANNOTATION_GLYPH = result };
             },
         };
 
         // terminal glyphs are presumably permissible
-        const result: u8 = try std.fmt.parseInt(u8, &parsedResult, 10);
+        const result: u8 = try std.fmt.parseInt(u8, parsedResult[0..writeIndex], 10);
         return .{ .NUMERIC_ANNOTATION_GLYPH = result };
     }
 };
 
+/// A general union type for
+/// all tag pairs.
+const TagPair = union {
+    StrTagPair: StrTagPair,
+    OptionalTagPair: OptionalTagPair,
+};
+
+/// A tag type used by the
+/// StrTagName union.
+const StrTagName = enum {
+    Event,
+    Site,
+    Date,
+    Round,
+    White,
+    Black,
+    Result,
+};
+
+/// A tag pair from the standard
+/// Seven Tag Roster (STR) as
+/// defined by the PGN spec.
+const StrTagPair = union(StrTagName) {
+    Event: []const u8,
+    Site: []const u8,
+    Date: Date,
+    Round: []const u8,
+    White: []const u8,
+    Black: []const u8,
+    Result: []const u8,
+};
+
+/// A tag type used by the
+/// OptionalTagPair union.
+const OptionalTagName = enum {
+    // player information (9.1)
+    WhiteTitle,
+    BlackTitle,
+    WhiteElo,
+    BlackElo,
+    WhiteUSCF,
+    BlackUSCF,
+    WhiteNA,
+    BlackNA,
+    WhiteType,
+    BlackType,
+
+    // event information (9.2)
+    EventDate,
+    EventSponsor,
+    Section,
+    Stage,
+    Board,
+
+    // opening information (9.3, 9.4)
+    Opening,
+    Variation,
+    SubVariation,
+    ECO,
+    NIC,
+
+    // time & date information (9.5)
+    Time,
+    UTCTime,
+    UTCDate,
+
+    // time control (9.6)
+    TimeControl, // NOTE: this has a very specific description, see 9.6.1
+
+    // alternative starting positions (9.7)
+    SetUp,
+    FEN,
+
+    // game conclusion (9.8)
+    Termination,
+
+    // miscellaneous (9.9)
+    Annotator,
+    Mode,
+    PlyCount,
+};
+
+/// An optional tag pair
+/// as described by section 9
+/// of the PGN spec.
+const OptionalTagPair = union(OptionalTagName) {
+    WhiteTitle: []const u8,
+    BlackTitle: []const u8,
+    WhiteElo: u16,
+    BlackElo: u16,
+    WhiteUSCF: u16,
+    BlackUSCF: u16,
+    WhiteNA: []const u8,
+    BlackNA: []const u8,
+    WhiteType: []const u8,
+    BlackType: []const u8,
+
+    EventDate: Date,
+    EventSponsor: []const u8,
+    Section: []const u8,
+    Stage: []const u8,
+    Board: u16,
+
+    Opening: []const u8,
+    Variation: []const u8,
+    SubVariation: []const u8,
+    ECO: []const u8,
+    NIC: []const u8,
+
+    Time: Time,
+    UTCTime: Time,
+    UTCDate: Date,
+
+    TimeControl: []const u8,
+
+    SetUp: bool,
+    FEN: fen.FenData,
+
+    Termination: []const u8,
+
+    Annotator: []const u8,
+    Mode: []const u8,
+    PlyCount: u16,
+};
+
 
 // general tasks
-// TODO: implement a token parsing function
 // TODO: write appropriate structs for data
 // TODO: robust testing on a larger data set
 
@@ -409,7 +564,7 @@ test "pgn.TokenIterator basic parsing" {
     // implicit free at end of scope
 
     var ti = TokenIterator{ .source = "[Name \"hello, world\"]",
-                            .allocator = allocator};
+                            .allocator = &allocator};
 
     try expectEqualDeep(Token{ .LEFT_BRACKET = {} }, (try ti.next()).?);
     try expectEqualDeep(Token{ .SYMBOL = &[_]u8{78, 97, 109, 101} }, (try ti.next()).?);
@@ -425,6 +580,46 @@ test "pgn.TokenIterator parsing NAGs" {
     var allocator = fba.allocator();
     // implicit free at end of scope
 
-    var ti1 = TokenIterator{ .source = "%236", .allocator = allocator };
+    var ti1 = TokenIterator{ .source = "%236", .allocator = &allocator };
     try expectEqualDeep(Token{ .NUMERIC_ANNOTATION_GLYPH = 236 }, (try ti1.next()).?);
+
+    var ti2 = TokenIterator{ .source = "%4", .allocator = &allocator };
+    try expectEqualDeep(Token{ .NUMERIC_ANNOTATION_GLYPH = 4 }, (try ti2.next()).?);
+}
+
+test "pgn.TokenIterator parsing whitespace" {
+    var buffer: [20]u8 = undefined;
+    var fba = std.heap.FixedBufferAllocator.init(&buffer);
+    var allocator = fba.allocator();
+    // implicit free at end of scope
+
+    var ti = TokenIterator{ .source = "  [  ]\n\n   <>", .allocator = &allocator };
+
+    try expectEqualDeep(Token{ .WHITESPACE = {} }, (try ti.next()).?);
+    try expectEqualDeep(Token{ .LEFT_BRACKET = {} }, (try ti.next()).?);
+    try expectEqualDeep(Token{ .WHITESPACE = {} }, (try ti.next()).?);
+    try expectEqualDeep(Token{ .RIGHT_BRACKET = {} }, (try ti.next()).?);
+    try expectEqualDeep(Token{ .WHITESPACE = {} }, (try ti.next()).?);
+    try expectEqualDeep(Token{ .LEFT_ANGLE_BRACKET = {} }, (try ti.next()).?);
+    try expectEqualDeep(Token{ .RIGHT_ANGLE_BRACKET = {} }, (try ti.next()).?);
+    try expectEqual(@as(?Token, null), try ti.next());
+}
+
+test "pgn.TokenIterator parsing unit tokens" {
+    var buffer: [20]u8 = undefined;
+    var fba = std.heap.FixedBufferAllocator.init(&buffer);
+    var allocator = fba.allocator();
+    // implicit free at end of scope
+
+    var ti = TokenIterator{ .source = "<>[]().*", .allocator = &allocator };
+
+    try expectEqualDeep(Token{ .LEFT_ANGLE_BRACKET = {} }, (try ti.next()).?);
+    try expectEqualDeep(Token{ .RIGHT_ANGLE_BRACKET = {} }, (try ti.next()).?);
+    try expectEqualDeep(Token{ .LEFT_BRACKET = {} }, (try ti.next()).?);
+    try expectEqualDeep(Token{ .RIGHT_BRACKET = {} }, (try ti.next()).?);
+    try expectEqualDeep(Token{ .LEFT_PARENTHESIS = {} }, (try ti.next()).?);
+    try expectEqualDeep(Token{ .RIGHT_PARENTHESIS = {} }, (try ti.next()).?);
+    try expectEqualDeep(Token{ .PERIOD = {} }, (try ti.next()).?);
+    try expectEqualDeep(Token{ .ASTERISK = {} }, (try ti.next()).?);
+    try expectEqual(@as(?Token, null), try ti.next());
 }
