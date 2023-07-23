@@ -85,11 +85,15 @@ const Opcode = enum {
     v9,         //      ...
 };
 
+/// Represents an operation
+/// as defined in an EPD string,
+/// which is an opcode associated
+/// with some particular data.
 const Operation = union(Opcode) {
     acn: u64,
     acs: u64,
-    am: []move.Move,
-    bm: []move.Move,
+    am: []move.SanMove,
+    bm: []move.SanMove,
     c0: ?[]const u8,
     c1: ?[]const u8,
     c2: ?[]const u8,
@@ -112,11 +116,11 @@ const Operation = union(Opcode) {
     id: []const u8,
     nic: ?[]const u8,
     noop: void,
-    pm: move.Move,
-    pv: ?[]move.Move,
+    pm: move.SanMove,
+    pv: ?[]move.SanMove,
     rc: u8,
     resign: void,
-    sm: move.Move,
+    sm: move.SanMove,
     tcgs: u64,
     tcri: [2][]const u8,
     tcsi: [2][]const u8,

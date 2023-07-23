@@ -24,9 +24,47 @@ const MoveFlag = enum(u4) {
     _,
 };
 
-/// A 2-byte struct representing a move, with additional metadata.
+/// A 2-byte struct representing a simple
+/// move, with additional metadata.
 pub const Move = packed struct {
     source: u6,
     target: u6,
     flag: MoveFlag = MoveFlag.NONE,
+};
+
+/// Describes the optional field
+/// used to disambiguate potentially
+/// ambiguous moves from one another
+/// in SAN, according to section
+/// 8.2.3.4 of the PGN spec.
+const SanDisambiguationField = packed union {
+    fileLetter: u8,
+    rankDigit: u8,
+    sourceSquare: u6,
+    none: void,
+};
+
+/// Describes the optional traditional
+/// suffix annotation used to describe
+/// qualitative aspects of a move.
+const SanSuffixAnnotation = enum {
+    NONE,
+    BANG,
+    HOOK,
+    BANG_BANG,
+    BANG_HOOK,
+    HOOK_BANG,
+    HOOK_HOOK,
+};
+
+/// A 4-byte struct representing the
+/// data communicated by a SAN symbol.
+pub const SanMove = packed struct {
+    target: u6,                     // 6 bits
+    pieceType: piece.PieceType,     // 3 bits
+    flag: MoveFlag = .NONE,         // 4 bits
+    disambiguationField: SanDisambiguationField = .{ .none = {} }, // 8 bits
+    isCheck: bool,
+    isCheckMate: bool,
+    suffix: SanSuffixAnnotation = .NONE,
 };

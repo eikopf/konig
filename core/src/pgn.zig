@@ -166,6 +166,7 @@ const fen = @import("fen.zig");
 
 const mem = std.mem;
 const Allocator = std.mem.Allocator;
+const AutoHashMap = std.hash_map.AutoHashMap;
 const expect = std.testing.expect;
 const expectEqual = std.testing.expectEqual;
 const expectEqualDeep = std.testing.expectEqualDeep;
@@ -241,7 +242,7 @@ const Token = union(TokenTag) {
 /// which repeatedly advances over it and
 /// returns valid PGN tokens.
 const TokenIterator = struct {
-    allocator: *Allocator,
+    allocator: Allocator,
     source: []const u8,
     index: usize = 0,
 
@@ -253,8 +254,8 @@ const TokenIterator = struct {
         return switch (self.source[self.index]) {
             // iterative cases
             '\n', ' ', 0x9, 0xE => self.parseWhitespace(),
-            '"' => try self.parseString(self.allocator),
-            'A'...'Z', 'a'...'z', '0'...'9' => |char| try self.parseSymbol(char, self.allocator),
+            '"' => try self.parseString(),
+            'A'...'Z', 'a'...'z', '0'...'9' => |char| try self.parseSymbol(char),
             '%' => try self.parseNumericAnnotationGlyph(),
 
             // single-char cases
@@ -299,7 +300,7 @@ const TokenIterator = struct {
     ///
     /// This function assumes that when it is
     /// invoked, source[index] == '"'.
-    fn parseString(self: *TokenIterator, allocator: *Allocator) !Token {
+    fn parseString(self: *TokenIterator) !Token {
         var value: [255]u8 = undefined;
         var writeIndex: u8 = 0;
         var escapeNextChar: bool = false;
@@ -320,7 +321,7 @@ const TokenIterator = struct {
                     writeIndex += 1;
                     escapeNextChar = false;
                 } else {
-                    const result = try allocator.dupe(u8, value[0..writeIndex]);
+                    const result = try self.allocator.dupe(u8, value[0..writeIndex]);
                     return .{ .STRING = result };
                 }
             },
@@ -352,7 +353,7 @@ const TokenIterator = struct {
     ///
     /// This function assumes that when it is invoked,
     /// source[index] is an alphanumeric character.
-    fn parseSymbol(self: *TokenIterator, firstChar: u8, allocator: *Allocator) !Token {
+    fn parseSymbol(self: *TokenIterator, firstChar: u8) !Token {
         var value: [255]u8 = undefined; // max symbol length is 255
         value[0] = firstChar;
 
@@ -380,7 +381,7 @@ const TokenIterator = struct {
             else => switch (isIntegerSymbol) {
                 true => return .{ .INTEGER = try std.fmt.parseInt(u32, value[0..writeIndex], 10) },
                 false => {
-                    const result = try allocator.dupe(u8, value[0..writeIndex]);
+                    const result = try self.allocator.dupe(u8, value[0..writeIndex]);
                     return .{ .SYMBOL = result };
                 }
             },
@@ -456,7 +457,20 @@ const StrTagPair = union(StrTagName) {
     Round: []const u8,
     White: []const u8,
     Black: []const u8,
-    Result: []const u8,
+    Result: GameTermination,
+};
+
+/// Represents the possible
+/// states of the Result tag
+/// pair, which should be
+/// identical to the string
+/// terminating the movetext
+/// section of the PGN record.
+const GameTermination = enum {
+    WhiteWin,
+    BlackWin,
+    Draw,
+    Ongoing,
 };
 
 /// A tag type used by the
@@ -553,6 +567,27 @@ const OptionalTagPair = union(OptionalTagName) {
 };
 
 
+/// Stores the complete record
+/// parsed from PGN.
+const PgnData = struct {
+    // STR
+    event: StrTagPair.Event,
+    site: StrTagPair.Site,
+    date: StrTagPair.Date,
+    round: StrTagPair.Round,
+    white: StrTagPair.White,
+    black: StrTagPair.Black,
+    result: StrTagPair.Result,
+
+    // optional tag pairs
+    optionalTagPairs: AutoHashMap(OptionalTagPair, void),
+
+    // move data
+    fullmoveCount: u16,
+    moves: []move.SanMove,
+};
+
+
 // general tasks
 // TODO: write appropriate structs for data
 // TODO: robust testing on a larger data set
@@ -564,7 +599,7 @@ test "pgn.TokenIterator basic parsing" {
     // implicit free at end of scope
 
     var ti = TokenIterator{ .source = "[Name \"hello, world\"]",
-                            .allocator = &allocator};
+                            .allocator = allocator};
 
     try expectEqualDeep(Token{ .LEFT_BRACKET = {} }, (try ti.next()).?);
     try expectEqualDeep(Token{ .SYMBOL = &[_]u8{78, 97, 109, 101} }, (try ti.next()).?);
@@ -580,10 +615,10 @@ test "pgn.TokenIterator parsing NAGs" {
     var allocator = fba.allocator();
     // implicit free at end of scope
 
-    var ti1 = TokenIterator{ .source = "%236", .allocator = &allocator };
+    var ti1 = TokenIterator{ .source = "%236", .allocator = allocator };
     try expectEqualDeep(Token{ .NUMERIC_ANNOTATION_GLYPH = 236 }, (try ti1.next()).?);
 
-    var ti2 = TokenIterator{ .source = "%4", .allocator = &allocator };
+    var ti2 = TokenIterator{ .source = "%4", .allocator = allocator };
     try expectEqualDeep(Token{ .NUMERIC_ANNOTATION_GLYPH = 4 }, (try ti2.next()).?);
 }
 
@@ -593,7 +628,7 @@ test "pgn.TokenIterator parsing whitespace" {
     var allocator = fba.allocator();
     // implicit free at end of scope
 
-    var ti = TokenIterator{ .source = "  [  ]\n\n   <>", .allocator = &allocator };
+    var ti = TokenIterator{ .source = "  [  ]\n\n   <>", .allocator = allocator };
 
     try expectEqualDeep(Token{ .WHITESPACE = {} }, (try ti.next()).?);
     try expectEqualDeep(Token{ .LEFT_BRACKET = {} }, (try ti.next()).?);
@@ -611,7 +646,7 @@ test "pgn.TokenIterator parsing unit tokens" {
     var allocator = fba.allocator();
     // implicit free at end of scope
 
-    var ti = TokenIterator{ .source = "<>[]().*", .allocator = &allocator };
+    var ti = TokenIterator{ .source = "<>[]().*", .allocator = allocator };
 
     try expectEqualDeep(Token{ .LEFT_ANGLE_BRACKET = {} }, (try ti.next()).?);
     try expectEqualDeep(Token{ .RIGHT_ANGLE_BRACKET = {} }, (try ti.next()).?);
