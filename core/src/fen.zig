@@ -52,7 +52,7 @@ pub const FenData = packed struct {
             var emptySpace: u8 = 0;
             var rankLength: u8 = 0;
             while (foli.next()) |code| {
-            switch (@enumFromInt(piece.Piece, code)) {
+                switch (@as(piece.Piece, @enumFromInt(code))) {
                 .NONE => {
                     if (emptySpace == 7) {
                         result[writeIndex] = '8';
@@ -118,7 +118,7 @@ pub const FenData = packed struct {
                     result[writeIndex] = '-';
                     writeIndex += 1;
                 },
-                0...63 => |index| for (board.indexToAlgebraicPosition(@intCast(u6, index))) |byte| {
+                0...63 => |index| for (board.indexToAlgebraicPosition(@as(u6, index))) |byte| {
                     result[writeIndex] = byte;
                     writeIndex += 1;
                 },
@@ -198,7 +198,7 @@ const FenIndexIterator = struct {
     }
 
     pub fn advance(self: *FenIndexIterator, steps: u6) !void {
-        if (@intCast(u8, self.steps) + steps > 64) return error.InvalidFenIndex;
+        if (@as(u8, self.steps) + steps > 64) return error.InvalidFenIndex;
 
         for (0..steps) |_| {
             _ = self.next();
@@ -233,13 +233,13 @@ fn parsePiecePlacement(str: []const u8) !board.Board {
             'q', 'Q', 'k',
             'K', 'n', 'N' => |pieceByte| {
                 const parsedPiece = try charToPiece(pieceByte);
-                const boardIndex: u8 = @intCast(u8, fii.next() orelse return error.InvalidFenStringComponent);
+                const boardIndex: u8 = @as(u8, fii.next() orelse return error.InvalidFenStringComponent);
 
                 layout |= @as(u256, @intFromEnum(parsedPiece)) << (4 * boardIndex);
             },
 
             '/' => continue,
-            '1'...'8' => |fillSpace| try fii.advance(@intCast(u6, fillSpace - utf8DigitOffset)),
+            '1'...'8' => |fillSpace| try fii.advance(@as(u6, fillSpace - utf8DigitOffset)),
             else => return error.InvalidFenStringComponent,
         }
     }
@@ -263,7 +263,7 @@ fn parseSideToMove(str: []const u8) !piece.PieceColor {
 /// of the "*CastleAvailable" fields in FenData.
 fn parseCastlingPermissions(str: []const u8) !u4 {
     inline for (validCastlingPermissions, 0..) |perm, i| {
-        if (mem.eql(u8, str, perm)) return @truncate(u4, i);
+        if (mem.eql(u8, str, perm)) return @truncate(i);
     }
 
     return error.InvalidFenStringComponent;
@@ -279,8 +279,8 @@ fn parseEnPassantTargetSquare(str: []const u8) !i7 {
 
     inline for (fileLetters, 0..) |file, i| {
         if (str[0] == file) return switch (str[1] == '3') {
-            true => @intCast(i7, @truncate(u6, 24 + i)),
-            false => @intCast(i7, @truncate(u6, 48 + i)),
+            true => @intCast(@as(u6, @truncate(24 + i))),
+            false => @intCast(@as(u6, @truncate(48 + i))),
         };
     }
 
@@ -398,7 +398,7 @@ test "fen.fenIndexToBoardIndex" {
     var arr: [64]u6 = undefined;
 
     for (0..64) |i| {
-        arr[i] = fenIndexToBoardIndex(@truncate(u6, i));
+        arr[i] = fenIndexToBoardIndex(@truncate(i));
     }
 
     const fenIndices = [64]u6{56, 57, 58, 59, 60, 61, 62, 63,
@@ -415,7 +415,7 @@ test "fen.fenIndexToBoardIndex" {
 
 test "fen.fenIndexToBoardIndex is its own inverse" {
     for(0..64) |i| {
-        try expectEqual(@intCast(u6, i), fenIndexToBoardIndex(fenIndexToBoardIndex(@intCast(u6, i))));
+        try expectEqual(@intCast(i), fenIndexToBoardIndex(fenIndexToBoardIndex(@intCast(i))));
     }
 }
 

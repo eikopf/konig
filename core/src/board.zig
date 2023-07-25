@@ -39,7 +39,7 @@ const ForwardLayoutIterator = struct {
     pub fn next(self: *ForwardLayoutIterator) ?u4 {
         if (self.index == 252) return null;
         self.index += 4;
-        return @intCast(u4, 0b1111 & (self.layout.* >> @intCast(u8, self.index)));
+        return @intCast(0b1111 & (self.layout.* >> @intCast(self.index)));
     }
 
     pub fn reset(self: *ForwardLayoutIterator) void {
@@ -56,7 +56,7 @@ const ReverseLayoutIterator = struct {
     pub fn next(self: *ReverseLayoutIterator) ?u4 {
         if (self.index == 0) return null;
         self.index -= 4;
-        return @intCast(u4, 0b1111 & (self.layout.* >> @intCast(u8, self.index)));
+        return @intCast(0b1111 & (self.layout.* >> @intCast(self.index)));
     }
 
     pub fn reset(self: *ReverseLayoutIterator) void {
@@ -83,7 +83,7 @@ const FenOrderedLayoutIterator = struct {
             self.rankIndex += 1;
         }
 
-        return @intCast(u4, 0b1111 & (self.layout.* >> @intCast(u8, self.index)));
+        return @intCast(0b1111 & (self.layout.* >> @intCast(self.index)));
     }
 
     pub fn reset(self: *FenOrderedLayoutIterator) void {
@@ -101,7 +101,7 @@ pub const Board = packed struct {
     fn getCodeAtIndex(self: *const Board, n: u8) u4 {
         assert(n >= 0 and n < 64);  // TODO: should this be an error?
 
-        return @truncate(u4, 0b1111 & (self.layout >> (4 * n)));
+        return @truncate(0b1111 & (self.layout >> (4 * n)));
     }
 
     /// Indexes n places into the board layout and returns the piece at that location.
@@ -110,7 +110,7 @@ pub const Board = packed struct {
 
         switch (code) {
             inline 0x7, 0x8, 0xf => return error.InvalidPieceCode,
-            else => return @enumFromInt(Piece, code),
+            else => return @enumFromInt(code),
         }
     }
 
@@ -138,7 +138,7 @@ pub const Board = packed struct {
 };
 
 /// Converts an algebraic position like "a3" or "G7" into an index from 0 to 63
-pub fn algebraicPositionToIndex(str: []const u8) !u8 {
+pub fn algebraicPositionToIndex(str: []const u8) !u6 {
 
     assert(str.len == 2);
 
@@ -166,7 +166,7 @@ pub fn algebraicPositionToIndex(str: []const u8) !u8 {
         else => return error.AlgebraicNotationConversionError,
     };
 
-    return (rank * 8) + file;
+    return @intCast((rank * 8) + file);
 }
 
 pub fn indexToAlgebraicPosition(index: u6) []const u8 {

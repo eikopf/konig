@@ -26,11 +26,11 @@ pub const Piece = enum(u4) {
     _,
 
     pub fn getType(self: Piece) PieceType {
-        return @enumFromInt(PieceType, @truncate(u3, @intFromEnum(self)));
+        return @enumFromInt(@as(u3, @truncate(@intFromEnum(self))));
     }
 
     pub fn getColor(self: Piece) PieceColor {
-        return @enumFromInt(bool, @truncate(bool, @intFromEnum(self) >> 3));
+        return @enumFromInt(@as(bool, @truncate(@intFromEnum(self) >> 3)));
     }
 };
 
