@@ -1,14 +1,5 @@
 const std = @import("std");
 
-// from https://zig.news/xq/cool-zig-patterns-paths-in-build-scripts-4p59
-fn sdkPath(comptime suffix: []const u8) []const u8 {
-    if (suffix[0] != '/') @compileError("relToPath requires an absolute path!");
-    return comptime blk: {
-        const root_dir = std.fs.path.dirname(@src().file) orelse ".";
-        break :blk root_dir ++ suffix;
-    };
-}
-
 // Although this function looks imperative, note that its job is to
 // declaratively construct a build graph that will be executed by an external
 // runner.
@@ -33,8 +24,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    //lib.addIncludePath("./include");
-    lib.addIncludePath(sdkPath("/include"));
+    lib.addIncludePath("include");
     lib.linkLibC();
 
     // This declares intent for the library to be installed into the standard
@@ -49,6 +39,8 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+    main_tests.addIncludePath("include");
+    main_tests.linkLibC();
 
     const run_main_tests = b.addRunArtifact(main_tests);
 
