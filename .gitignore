@@ -1,3 +1,8 @@
+# zig section
 **/zig-cache
 **/zig-out
 **/.DS_Store
+
+# rust section
+rust-core/target/
+Cargo.lock
