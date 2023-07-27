@@ -1,12 +1,14 @@
 const std = @import("std");
 const piece = @import("piece.zig");
 const board = @import("board.zig");
+const regex = @import("regex.zig");
 
 const Piece = piece.Piece;
 const assert = std.debug.assert;
-
 const expectEqual = std.testing.expectEqual;
 const expectError = std.testing.expectError;
+
+const sanMoveRegexPattern = "^([PNBRQK]?[a-h]?[1-8]?[xX-]?[a-h][1-8](\\=[NBRQ]| ?e\\.p\\.)?|^O-O(?:-O)?)[+#$]?[?!]?[?!]?$";
 
 /// Stores metadata associated with a given move. The *_PROMOTION values are defined
 /// such that the lower three bits correspond to the particular PieceType that they
@@ -200,4 +202,16 @@ test "SAN literal parsing" {
     try expectEqual(true, result.normal.isCheckmate);
     try expectEqual(@as(u6, 4), result.normal.target);
     try expectEqual(SanSuffixAnnotation.HOOK_HOOK, result.normal.suffix);
+}
+
+test "SAN regex parsing" {
+    var buf: [50]u8 = undefined;
+    var fba = std.heap.FixedBufferAllocator.init(&buf);
+    var allocator = fba.allocator();
+
+    const re = try regex.compileRegex(sanMoveRegexPattern, allocator);
+    defer regex.freeRegex(re, allocator);
+
+    try expectEqual(true, regex.isMatch(re, "Qxb6"));
+    try expectEqual(true, regex.isMatch(re, "a8=N#!"));
 }
