@@ -1,4 +1,5 @@
 use crate::core::pieces::Piece;
+use super::pieces::PieceRepresentationError;
 
 /// Represents a single position in a
 /// chess game (aka a board state) as
@@ -25,7 +26,12 @@ use crate::core::pieces::Piece;
 pub struct Position(u64, u64, u64, u64);
 
 impl Position {
-    fn try_get(&self, index: u8) -> Result<Piece, &'static str> {
+
+    /// Attempts to retrieve the `Piece` at the
+    /// given index.
+    ///
+    /// This operation is a constant time lookup.
+    pub fn try_get(&self, index: u8) -> Result<Piece, PieceRepresentationError> {
         let b1 = ((self.0 >> index) & 1) as u8;
         let b2 = ((self.1 >> index) & 1) as u8;
         let b3 = ((self.2 >> index) & 1) as u8;
@@ -35,12 +41,17 @@ impl Position {
         return Piece::try_from(trunc)
     }
 
-    fn try_write(&mut self, index: u8, piece: Piece) -> Result<(), &'static str> {
+    /// Attempts to write the given `Piece` to the
+    /// given index.
+    ///
+    /// This operation will only error for invalid
+    /// indices, i.e. indices greater than 63.
+    pub fn try_write(&mut self, index: u8, piece: Piece) -> Result<(), ()> {
         let code: u8 = piece.into();
 
         // check index validity
         if index >= 64 {
-            return Err("Invalid index into a position: it must be in [0, 63]")
+            return Err(())
         }
 
         // compute per-channel bits
@@ -51,16 +62,35 @@ impl Position {
 
         // write bits to channels
         let index_mask = !(1 << index); // 1 everywhere except for the index bit
-        self.0 |= index_mask;
-        self.0 &= b1 << index;
-        self.1 |= index_mask;
-        self.1 &= b2 << index;
-        self.2 |= index_mask;
-        self.2 &= b3 << index;
-        self.3 |= index_mask;
-        self.3 &= b4 << index;
-
+        self.0 &= index_mask;
+        self.0 |= b1 << index;
+        self.1 &= index_mask;
+        self.1 |= b2 << index;
+        self.2 &= index_mask;
+        self.2 |= b3 << index;
+        self.3 &= index_mask;
+        self.3 |= b4 << index;
 
         return Ok(())
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::core::{pieces::{Piece, PieceColor, PieceType}, positions::Position};
+
+        #[test]
+        fn validate_position_try_get_and_try_write() {
+                let mut pos = Position(0, 0, 0, 0);
+                pos.try_write(4, Piece {
+                        color: PieceColor::White,
+                        kind: PieceType::Knight,
+                }).unwrap();
+
+                let piece = pos.try_get(4).unwrap();
+                assert_eq!(piece, Piece{
+                        color: PieceColor::White,
+                        kind: PieceType::Knight,
+                });
+        }
 }

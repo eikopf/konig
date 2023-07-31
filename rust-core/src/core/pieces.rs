@@ -1,3 +1,20 @@
+use thiserror::Error;
+
+/// An error enumerating the ways
+/// in which the `u8` representation
+/// of a `Piece` may fail.
+#[derive(Error, Debug)]
+pub enum PieceRepresentationError {
+    #[error("invalid integer representation of a PieceColor")]
+    InvalidColorBit,
+
+    #[error("invalid integer representation of a PieceType")]
+    InvalidTypeBits,
+
+    #[error("invalid integer representation of a Piece")]
+    Unknown,
+}
+
 /// Represents the color associated with
 /// a piece in a binary choice.
 ///
@@ -5,7 +22,7 @@
 /// integer, the discriminant of this
 /// enum will be the 4th bit.
 #[derive(Debug, PartialEq, Eq)]
-enum PieceColor {
+pub enum PieceColor {
     Black = 0,
     White = 1,
 }
@@ -19,7 +36,7 @@ enum PieceColor {
 /// integer, the discriminant of this
 /// enum will be the lower 3 bits.
 #[derive(Debug, PartialEq, Eq)]
-enum PieceType {
+pub enum PieceType {
     None = 0,
     Pawn = 1,
     Rook = 2,
@@ -46,7 +63,7 @@ enum PieceType {
 /// state of a game in just 32 bytes
 /// as each "channel" (bit) of the
 /// 4-bit representation can be
-/// stored as a `u64`, and read/write
+/// stored in a `u64`, and read/write
 /// operations can be accomplished
 /// with left and right shifts.
 ///
@@ -56,12 +73,12 @@ enum PieceType {
 /// `Piece` has `size = 2`.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Piece {
-    color: PieceColor,
-    kind: PieceType,
+    pub color: PieceColor,
+    pub kind: PieceType,
 }
 
 impl TryFrom<u8> for Piece {
-    type Error = &'static str;
+    type Error = PieceRepresentationError;
 
     /// Attempts to convert a `u8` into a `Piece`.
     ///
@@ -74,7 +91,7 @@ impl TryFrom<u8> for Piece {
         let color = match value >> 3 {
             0 => PieceColor::Black,
             1 => PieceColor::White,
-            _ => return Err("Provided value is invalid in the upper 5 bits"),
+            _ => return Err(PieceRepresentationError::InvalidColorBit),
         };
 
         let kind = match value % 8 {
@@ -85,7 +102,7 @@ impl TryFrom<u8> for Piece {
             4 => PieceType::Bishop,
             5 => PieceType::Queen,
             6 => PieceType::King,
-            _ => return Err("Provided value is invalid in the lower 3 bits"),
+            _ => return Err(PieceRepresentationError::InvalidTypeBits),
         };
 
         return Ok(Piece{color, kind})
