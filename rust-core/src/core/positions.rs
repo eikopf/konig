@@ -1,3 +1,4 @@
+use packed_struct::prelude::*;
 use crate::core::pieces::Piece;
 use super::pieces::PieceRepresentationError;
 
@@ -22,8 +23,20 @@ use super::pieces::PieceRepresentationError;
 /// `[Piece; 64]` implementation, using
 /// only 25% the memory to represent
 /// an equivalent position.
-#[derive(Debug, Eq, PartialEq)]
-pub struct Position(u64, u64, u64, u64);
+#[derive(Debug, Eq, PartialEq, PackedStruct)]
+#[packed_struct(bit_numbering="msb0", endian="msb")]
+pub struct Position {
+        ch1: u64,
+        ch2: u64,
+        ch3: u64,
+        ch4: u64
+}
+
+pub struct FenOrderedPositionIterator<'a> {
+        source: &'a Position,
+        index: u8,
+        rank_index: u8,
+}
 
 impl Position {
 
@@ -32,10 +45,10 @@ impl Position {
     ///
     /// This operation is a constant time lookup.
     pub fn try_get(&self, index: u8) -> Result<Piece, PieceRepresentationError> {
-        let b1 = ((self.0 >> index) & 1) as u8;
-        let b2 = ((self.1 >> index) & 1) as u8;
-        let b3 = ((self.2 >> index) & 1) as u8;
-        let b4 = ((self.3 >> index) & 1) as u8;
+        let b1 = ((self.ch1 >> index) & 1) as u8;
+        let b2 = ((self.ch2 >> index) & 1) as u8;
+        let b3 = ((self.ch3 >> index) & 1) as u8;
+        let b4 = ((self.ch4 >> index) & 1) as u8;
 
         let trunc = (b1 + (b2 << 1) + (b3 << 2) + (b4 << 3)) as u8;
         return Piece::try_from(trunc)
@@ -62,16 +75,25 @@ impl Position {
 
         // write bits to channels
         let index_mask = !(1 << index); // 1 everywhere except for the index bit
-        self.0 &= index_mask;
-        self.0 |= b1 << index;
-        self.1 &= index_mask;
-        self.1 |= b2 << index;
-        self.2 &= index_mask;
-        self.2 |= b3 << index;
-        self.3 &= index_mask;
-        self.3 |= b4 << index;
+        self.ch1 &= index_mask;
+        self.ch1 |= b1 << index;
+        self.ch2 &= index_mask;
+        self.ch2 |= b2 << index;
+        self.ch3 &= index_mask;
+        self.ch3 |= b3 << index;
+        self.ch4 &= index_mask;
+        self.ch4 |= b4 << index;
 
         return Ok(())
+    }
+
+    pub fn empty() -> Position {
+        Position {
+            ch1: 0,
+            ch2: 0,
+            ch3: 0,
+            ch4: 0,
+        }
     }
 }
 
@@ -81,7 +103,7 @@ mod tests {
 
         #[test]
         fn validate_position_try_get_and_try_write() {
-                let mut pos = Position(0, 0, 0, 0);
+                let mut pos = Position { ch1: 0, ch2: 0, ch3: 0, ch4: 0 };
                 pos.try_write(4, Piece {
                         color: PieceColor::White,
                         kind: PieceType::Knight,

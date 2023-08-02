@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use thiserror::Error;
 
 /// An error enumerating the ways
@@ -11,7 +13,25 @@ pub enum PieceRepresentationError {
     #[error("invalid integer representation of a PieceType")]
     InvalidTypeBits,
 
-    #[error("invalid integer representation of a Piece")]
+    #[error("invalid character representation of a Piece")]
+    InvalidChar,
+
+    #[error("invalid representation of a Piece")]
+    Unknown,
+}
+
+#[derive(Error, Debug)]
+pub enum PositionError {
+    #[error("failed to write `{piece}` to index `{index}` in a position")]
+    BadWrite{
+        index: u8,
+        piece: Piece,
+    },
+
+    #[error("failed to read from index `{0}` in a position")]
+    BadRead(u8),
+
+    #[error("some interaction with a position has failed")]
     Unknown,
 }
 
@@ -21,7 +41,7 @@ pub enum PieceRepresentationError {
 /// When a `Piece` is mapped to a 4 bit
 /// integer, the discriminant of this
 /// enum will be the 4th bit.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum PieceColor {
     Black = 0,
     White = 1,
@@ -35,7 +55,7 @@ pub enum PieceColor {
 /// When a `Piece` is mapped to a 4 bit
 /// integer, the discriminant of this
 /// enum will be the lower 3 bits.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum PieceType {
     None = 0,
     Pawn = 1,
@@ -77,6 +97,14 @@ pub struct Piece {
     pub kind: PieceType,
 }
 
+impl Display for Piece {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let color_bit: u8 = (self.color as u8) << 3;
+        let type_bits: u8 = self.kind as u8;
+        write!(f, "{}", color_bit | type_bits)
+    }
+}
+
 impl TryFrom<u8> for Piece {
     type Error = PieceRepresentationError;
 
@@ -106,6 +134,28 @@ impl TryFrom<u8> for Piece {
         };
 
         return Ok(Piece{color, kind})
+    }
+}
+
+impl TryFrom<char> for Piece {
+    type Error = PieceRepresentationError;
+
+    fn try_from(value: char) -> Result<Self, Self::Error> {
+        match value {
+            'p' => Ok(Piece{ color: PieceColor::Black, kind: PieceType::Pawn }),
+            'P' => Ok(Piece { color: PieceColor::White, kind: PieceType::Pawn }),
+            'r' => Ok(Piece { color: PieceColor::Black, kind: PieceType::Rook }),
+            'R' => Ok(Piece { color: PieceColor::White, kind: PieceType::Rook }),
+            'b' => Ok(Piece { color: PieceColor::Black, kind: PieceType::Bishop }),
+            'B' => Ok(Piece { color: PieceColor::White, kind: PieceType::Bishop }),
+            'n' => Ok(Piece { color: PieceColor::Black, kind: PieceType::Knight }),
+            'N' => Ok(Piece { color: PieceColor::White, kind: PieceType::Knight }),
+            'q' => Ok(Piece { color: PieceColor::Black, kind: PieceType::Queen }),
+            'Q' => Ok(Piece { color: PieceColor::White, kind: PieceType::Queen }),
+            'k' => Ok(Piece { color: PieceColor::Black, kind: PieceType::King }),
+            'K' => Ok(Piece { color: PieceColor::White, kind: PieceType::King }),
+            _ => Err(PieceRepresentationError::InvalidChar),
+        }
     }
 }
 
