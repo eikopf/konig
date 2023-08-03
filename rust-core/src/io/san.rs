@@ -47,18 +47,24 @@ struct SanStandardMoveData {
     suffix: Option<SanSuffixAnnotation>,
 }
 
+enum SanCastleSide {
+    KingSide,
+    QueenSide,
+}
+
 /// A struct representing the data
 /// communicated by a SAN move which
 /// describes castling.
 #[derive(Debug, PartialEq, Eq)]
 struct SanCastleMoveData {
+    side: SanCastleSide,
     is_check: bool,
     is_checkmate: bool,
 }
 
+/// Describes the possible types of moves
 #[derive(Debug, PartialEq, Eq)]
 pub enum SanMove {
     Normal(SanStandardMoveData),
-    KingSideCastle(SanCastleMoveData),
-    QueenSideCastle(SanCastleMoveData),
+    Castle(SanCastleMoveData),
 }
