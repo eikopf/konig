@@ -72,6 +72,24 @@ impl FenIndexIterator {
             rank_index: 0
         }
     }
+
+    /// Advances by `steps` steps by
+    /// repeatedly calling next and
+    /// discarding the result.
+    ///
+    /// This function will return an
+    /// error if it tries to advance
+    /// beyond the end of the iterator.
+    pub fn advance_by(&mut self, steps: usize) -> Result<(), ()> {
+        for _ in 0..steps {
+            match self.next() {
+                Some(_) => continue,
+                None => return Err(()),
+            }
+        }
+
+        Ok(())
+    }
 }
 
 /// Represents the possible castling
@@ -119,12 +137,12 @@ impl CastlingPermissions {
 /// the equivalent Zig implementation.
 #[derive(Debug, PartialEq, Eq)]
 pub struct FenData {
-    position: Position,
-    side_to_move: PieceColor,
-    castling_permissions: CastlingPermissions,
-    en_passant_target_square: Option<u8>,
-    halfmove_clock: u8,
-    fullmove_counter: u16,
+    pub position: Position,
+    pub side_to_move: PieceColor,
+    pub castling_permissions: CastlingPermissions,
+    pub en_passant_target_square: Option<u8>,
+    pub halfmove_clock: u8,
+    pub fullmove_counter: u16,
 }
 
 impl TryFrom<&str> for FenData {
@@ -171,13 +189,13 @@ fn try_parse_piece_placement(source: &str) -> Result<Position, FenParseError> {
 
         '/' => continue,
         fill @ '1'..='8' => {
-            let _ = fen_index_iterator.skip(fill
-                                            .to_digit(10)
-                                            .unwrap()
-                                            .try_into()
-                                            .or_else(|_| {
-                                                return Err(FenParseError::InvalidPositionComponent)
-                                            })?
+            let _ = fen_index_iterator.advance_by(
+                fill.to_digit(10)
+                    .unwrap()
+                    .try_into()
+                    .or_else(|_| {
+                        return Err(FenParseError::InvalidPositionComponent)
+                    })?
             );
         }
         _ => return Err(FenParseError::InvalidPositionComponent),
@@ -194,13 +212,9 @@ fn try_parse_side_to_move(source: &str) -> Result<PieceColor, FenParseError> {
     if source.len() != 1 { return Err(FenParseError::InvalidPieceToMoveComponent) };
 
     match source.chars().next() {
-        Some(char) => match char {
-            'w' => Ok(PieceColor::White),
-            'b' => Ok(PieceColor::Black),
-            _ => Err(FenParseError::InvalidPieceToMoveComponent),
-        },
-
-        None => Err(FenParseError::InvalidPieceToMoveComponent)
+        Some('w') => Ok(PieceColor::White),
+        Some('b') => Ok(PieceColor::Black),
+        _ => Err(FenParseError::InvalidPieceToMoveComponent)
     }
 }
 
@@ -310,21 +324,14 @@ fn try_parse_en_passant_target_square(source: &str) -> Result<Option<u8>, FenPar
 
     let mut source_char_iterator = source.chars();
     let rank = match source_char_iterator.next() {
-        Some(char) => match char {
-            rank_char @ 'a'..='h' => rank_char,
-            _ => return Err(FenParseError::InvalidEnPassantTargetSquareComponent)
-        }
-
-        None => return Err(FenParseError::InvalidEnPassantTargetSquareComponent)
+        Some(rank_char @ 'a'..='h') => rank_char,
+        _ => return Err(FenParseError::InvalidEnPassantTargetSquareComponent)
     };
 
     let file = match source_char_iterator.next() {
-        Some(char) => match char {
-            file_char @ '3' | file_char @ '6' => file_char.to_digit(10).unwrap(),
-            _ => return Err(FenParseError::InvalidEnPassantTargetSquareComponent)
-        }
-
-        None => return Err(FenParseError::InvalidEnPassantTargetSquareComponent)
+        Some('3') => 3,
+        Some('6') => 6,
+        _ => return Err(FenParseError::InvalidEnPassantTargetSquareComponent)
     };
 
     let index = (rank as u8) * 8 + (file as u8);
@@ -337,11 +344,8 @@ fn try_parse_en_passant_target_square(source: &str) -> Result<Option<u8>, FenPar
 /// The resulting `u8` will be in the range \[0, 50\].
 fn try_parse_halfmove_clock(source: &str) -> Result<u8, FenParseError> {
     match source.parse::<u8>() {
-        Ok(clock_value) => match clock_value {
-            51.. => Err(FenParseError::InvalidHalfmoveClockComponent),
-            other @ 0..=50  => Ok(other),
-        },
-        Err(_) => Err(FenParseError::InvalidHalfmoveClockComponent),
+        Ok(value @ 0..=50) => Ok(value),
+        _ => Err(FenParseError::InvalidHalfmoveClockComponent),
     }
 }
 
@@ -353,11 +357,53 @@ fn try_parse_halfmove_clock(source: &str) -> Result<u8, FenParseError> {
 /// to describe all valid inputs.
 fn try_parse_fullmove_counter(source: &str) -> Result<u16, FenParseError> {
     match source.parse::<u16>() {
-        Ok(counter_value) => match counter_value {
-            0 => Err(FenParseError::InvalidFullmoveCounterComponent),
-            other @ 1.. => Ok(other),
-        }
+        Ok(value @ 1..) => Ok(value),
+        _ => Err(FenParseError::InvalidFullmoveCounterComponent),
+    }
+}
 
-        Err(_) => Err(FenParseError::InvalidFullmoveCounterComponent),
+#[cfg(test)]
+mod tests {
+    use crate::{core::pieces::{PieceColor, Piece, PieceType}, io::fen::CastlingPermissions};
+    use super::{FenData, FenIndexIterator};
+
+
+    #[test]
+    fn validate_fen_parsing() {
+        let initial_state = FenData::try_from(
+            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+        ).unwrap();
+
+        println!("{:?}", initial_state);
+
+        assert_eq!(initial_state.position.try_get(0), Ok(
+            Piece {
+                color: PieceColor::White,
+                kind: PieceType::Rook,
+            }
+        ));
+
+        assert_eq!(initial_state.position.try_get(63), Ok(
+            Piece {
+                color: PieceColor::Black,
+                kind: PieceType::Rook,
+            }
+        ));
+
+        assert_eq!(initial_state.side_to_move, PieceColor::White);
+        assert_eq!(initial_state.castling_permissions, CastlingPermissions::default());
+        assert_eq!(initial_state.en_passant_target_square, None);
+        assert_eq!(initial_state.halfmove_clock, 0);
+        assert_eq!(initial_state.fullmove_counter, 1);
+    }
+
+    #[test]
+    fn debug_fen_index_iterator() {
+        let fii = &mut FenIndexIterator::new();
+
+        assert_eq!(fii.next(), Some(56));
+        assert_eq!(fii.next(), Some(57));
+        let _ = fii.advance_by(7).unwrap();
+        assert_eq!(fii.next(), Some(49));
     }
 }

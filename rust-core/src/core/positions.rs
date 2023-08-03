@@ -1,6 +1,23 @@
 use packed_struct::prelude::*;
 use crate::core::pieces::Piece;
 use super::pieces::PieceRepresentationError;
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum PositionError {
+    #[error("failed to write `{piece}` to index `{index}` in a position")]
+    BadWrite{
+        index: u8,
+        piece: Piece,
+    },
+
+    #[error("failed to read from index `{0}` in a position")]
+    BadRead(u8),
+
+    #[error("some interaction with a position has failed")]
+    Unknown,
+}
+
 
 /// Represents a single position in a
 /// chess game (aka a board state) as
@@ -30,12 +47,6 @@ pub struct Position {
         ch2: u64,
         ch3: u64,
         ch4: u64
-}
-
-pub struct FenOrderedPositionIterator<'a> {
-        source: &'a Position,
-        index: u8,
-        rank_index: u8,
 }
 
 impl Position {

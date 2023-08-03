@@ -5,7 +5,7 @@ use thiserror::Error;
 /// An error enumerating the ways
 /// in which the `u8` representation
 /// of a `Piece` may fail.
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum PieceRepresentationError {
     #[error("invalid integer representation of a PieceColor")]
     InvalidColorBit,
@@ -17,21 +17,6 @@ pub enum PieceRepresentationError {
     InvalidChar,
 
     #[error("invalid representation of a Piece")]
-    Unknown,
-}
-
-#[derive(Error, Debug)]
-pub enum PositionError {
-    #[error("failed to write `{piece}` to index `{index}` in a position")]
-    BadWrite{
-        index: u8,
-        piece: Piece,
-    },
-
-    #[error("failed to read from index `{0}` in a position")]
-    BadRead(u8),
-
-    #[error("some interaction with a position has failed")]
     Unknown,
 }
 
