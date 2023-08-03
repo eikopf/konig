@@ -1,4 +1,44 @@
 use crate::core::pieces::PieceType;
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+enum SanParseError {
+    #[error("Expected one of 'O', 'K', 'Q', 'B', 'R', 'N'; got {0}")]
+    InvalidLeadingChar(char),
+
+    #[error("Expected a target in the range [0, 63]; got {0}")]
+    InvalidTargetSquare(Option<u8>),
+
+    #[error("Expected a value fulfilling [xX-]; got {0}")]
+    InvalidCaptureChar(char),
+
+    #[error("Expected a value fulfilling [a-h]?[1-8]?; got {0}")]
+    InvalidDisambiguationField(&str),
+
+    #[error("Expected a value fulfilling [?!]?[?!]?; got {0}")]
+    InvalidSuffixField(&str),
+
+    #[error("Expected a value fulfilling [+]?; got {0}")]
+    InvalidCheckChar(char),
+
+    #[error("Expected a value fulfilling [#]?; got {0}")]
+    InvalidCheckmateChar(char),
+
+    #[error("Expected a value fulfilling =[NBRQ]; got {0}")]
+    InvalidPromotionStr(&str),
+
+    #[error("Expected either \"O-O\" or \"O-O-O\"; got {0}")]
+    InvalidCastleMoveStr(&str),
+
+    #[error("Parsed {0} at an invalid location")]
+    InvalidChar(char),
+
+    #[error("Expected a literal with at least 2 and at most 12 characters; got {0}")]
+    InvalidLiteralLength(u8),
+
+    #[error("Failed to parse the provided SAN literal")]
+    Unknown,
+}
 
 /// Describes the optional field
 /// used to disambiguate potentially
@@ -6,7 +46,7 @@ use crate::core::pieces::PieceType;
 /// in the SAN standard, according
 /// to section 8.2.3.4 of the PGN spec.
 #[derive(Debug, PartialEq, Eq)]
-enum SanDisambiguationField {
+enum DisambiguationField {
     FileLetter(u8),
     RankDigit(u8),
     SourceSquare(u8),
@@ -22,7 +62,7 @@ enum SanDisambiguationField {
 /// the word hook corresponds to the
 /// question mark (?).
 #[derive(Debug, PartialEq, Eq)]
-enum SanSuffixAnnotation {
+enum SuffixAnnotation {
     Bang,
     Hook,
     BangBang,
@@ -35,36 +75,104 @@ enum SanSuffixAnnotation {
 /// communicated by a standard SAN
 /// move.
 #[derive(Debug, PartialEq, Eq)]
-struct SanStandardMoveData {
+struct StandardMoveData {
     target: u8,
     piece_type: Option<PieceType>,
     promotion_piece_type: Option<PieceType>,
-    disambiguation_field: Option<SanDisambiguationField>,
+    disambiguation_field: Option<DisambiguationField>,
     is_capture: bool,
     is_check: bool,
     is_checkmate: bool,
     is_promotion: bool,
-    suffix: Option<SanSuffixAnnotation>,
+    suffix: Option<SuffixAnnotation>,
 }
 
-enum SanCastleSide {
+/// Denotes which side of the board
+/// a castle is directed towards.
+#[derive(Debug, PartialEq, Eq)]
+enum CastleSide {
     KingSide,
     QueenSide,
+}
+
+/// Represents the value parsed from
+/// the very first character in a SAN
+/// literal, which will denote (or imply)
+/// the piece being moved.
+enum LeadingCharValue {
+    Piece(PieceType),
+    Castle,
 }
 
 /// A struct representing the data
 /// communicated by a SAN move which
 /// describes castling.
 #[derive(Debug, PartialEq, Eq)]
-struct SanCastleMoveData {
-    side: SanCastleSide,
+struct CastleMoveData {
+    side: CastleSide,
     is_check: bool,
     is_checkmate: bool,
 }
 
-/// Describes the possible types of moves
+/// Describes the data parsed from a
+/// SAN literal, split between normal
+/// moves and the two castling variants.
 #[derive(Debug, PartialEq, Eq)]
 pub enum SanMove {
-    Normal(SanStandardMoveData),
-    Castle(SanCastleMoveData),
+    Normal(StandardMoveData),
+    Castle(CastleMoveData),
+}
+
+struct LiteralParser {
+    source: &str,
+    index: u8,
+}
+
+impl From<&str> for LiteralParser {
+    fn from(value: &str) -> Self {
+        LiteralParser {
+            source: value,
+            index: 0,
+        }
+    }
+}
+
+impl LiteralParser {
+    fn try_parse_leading_char(&mut self) -> Result<LeadingCharValue, SanParseError> {
+        let value = match self.source.chars().nth(self.index) {
+            Some('a'..'h') => return Ok(Piece(PieceType::Pawn)), // early return, no increment
+            Some('R') => Piece(PieceType::Rook),
+            Some('N') => Piece(PieceType::Knight),
+            Some('B') => Piece(PieceType::Bishop),
+            Some('Q') => Piece(PieceType::Queen),
+            Some('K') => Piece(PieceType::King),
+            Some('O') => Castle,
+            other @ _ => return Err(SanParseError::InvalidLeadingChar(other)),
+        };
+
+        self.index += 1;
+        return Ok(value)
+    }
+
+    fn try_parse_target_square(&mut self) -> Result<u8, SanParseError> {
+        let source_iter = self.source.chars();
+        let rank = match source_iter.nth(self.index) {
+            Some(rank @ 'a'..'h') => rank,
+            _ => return Err(SanParseError::InvalidTargetSquare(None)),
+        };
+
+        let file = match source_iter.next() {
+            Some(file @ '1'..'8') => file,
+            _ => return Err(SanParseError::InvalidTargetSquare(None)),
+        };
+
+        self.index += 2;
+        return Ok((rank as u8) * 8 + (file as u8))
+    }
+
+    fn try_parse_capture_field(&mut self) -> Result<bool, SanParseError> {
+        todo!();
+    }
+
+    // TODO: complete remainder of parser
 }
