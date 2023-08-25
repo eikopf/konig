@@ -1,22 +1,22 @@
-use crate::core::pieces::PieceType;
+use crate::core::piece::PieceType;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-enum SanParseError {
+enum SanParseError<'a> {
     #[error("Expected one of 'O', 'K', 'Q', 'B', 'R', 'N'; got {0}")]
     InvalidLeadingChar(char),
 
-    #[error("Expected a target in the range [0, 63]; got {0}")]
+    #[error("Expected a target in the range [0, 63]; got {0:?}")]
     InvalidTargetSquare(Option<u8>),
 
     #[error("Expected a value fulfilling [xX-]; got {0}")]
     InvalidCaptureChar(char),
 
     #[error("Expected a value fulfilling [a-h]?[1-8]?; got {0}")]
-    InvalidDisambiguationField(&str),
+    InvalidDisambiguationField(&'a str),
 
     #[error("Expected a value fulfilling [?!]?[?!]?; got {0}")]
-    InvalidSuffixField(&str),
+    InvalidSuffixField(&'a str),
 
     #[error("Expected a value fulfilling [+]?; got {0}")]
     InvalidCheckChar(char),
@@ -25,10 +25,10 @@ enum SanParseError {
     InvalidCheckmateChar(char),
 
     #[error("Expected a value fulfilling =[NBRQ]; got {0}")]
-    InvalidPromotionStr(&str),
+    InvalidPromotionStr(&'a str),
 
     #[error("Expected either \"O-O\" or \"O-O-O\"; got {0}")]
-    InvalidCastleMoveStr(&str),
+    InvalidCastleMoveStr(&'a str),
 
     #[error("Parsed {0} at an invalid location")]
     InvalidChar(char),
@@ -75,7 +75,7 @@ enum SuffixAnnotation {
 /// communicated by a standard SAN
 /// move.
 #[derive(Debug, PartialEq, Eq)]
-struct StandardMoveData {
+pub struct StandardMoveData {
     target: u8,
     piece_type: Option<PieceType>,
     promotion_piece_type: Option<PieceType>,
@@ -108,7 +108,7 @@ enum LeadingCharValue {
 /// communicated by a SAN move which
 /// describes castling.
 #[derive(Debug, PartialEq, Eq)]
-struct CastleMoveData {
+pub struct CastleMoveData {
     side: CastleSide,
     is_check: bool,
     is_checkmate: bool,
@@ -124,12 +124,12 @@ pub enum SanMove {
 }
 
 struct LiteralParser {
-    source: &str,
+    source: String,
     index: u8,
 }
 
-impl From<&str> for LiteralParser {
-    fn from(value: &str) -> Self {
+impl From<String> for LiteralParser {
+    fn from(value: String) -> Self {
         LiteralParser {
             source: value,
             index: 0,
@@ -139,30 +139,30 @@ impl From<&str> for LiteralParser {
 
 impl LiteralParser {
     fn try_parse_leading_char(&mut self) -> Result<LeadingCharValue, SanParseError> {
-        let value = match self.source.chars().nth(self.index) {
-            Some('a'..'h') => return Ok(Piece(PieceType::Pawn)), // early return, no increment
-            Some('R') => Piece(PieceType::Rook),
-            Some('N') => Piece(PieceType::Knight),
-            Some('B') => Piece(PieceType::Bishop),
-            Some('Q') => Piece(PieceType::Queen),
-            Some('K') => Piece(PieceType::King),
-            Some('O') => Castle,
-            other @ _ => return Err(SanParseError::InvalidLeadingChar(other)),
+        let value = match self.source.chars().nth(self.index.into()) {
+            Some('a'..='h') => return Ok(LeadingCharValue::Piece(PieceType::Pawn)), // early return, no increment
+            Some('R') => Ok(LeadingCharValue::Piece(PieceType::Rook)),
+            Some('N') => Ok(LeadingCharValue::Piece(PieceType::Knight)),
+            Some('B') => Ok(LeadingCharValue::Piece(PieceType::Bishop)),
+            Some('Q') => Ok(LeadingCharValue::Piece(PieceType::Queen)),
+            Some('K') => Ok(LeadingCharValue::Piece(PieceType::King)),
+            Some('O') => Ok(LeadingCharValue::Castle),
+            other @ _ => return Err(SanParseError::InvalidLeadingChar(other.unwrap_or('\0'))),
         };
 
         self.index += 1;
-        return Ok(value)
+        return value
     }
 
     fn try_parse_target_square(&mut self) -> Result<u8, SanParseError> {
-        let source_iter = self.source.chars();
-        let rank = match source_iter.nth(self.index) {
-            Some(rank @ 'a'..'h') => rank,
+        let mut source_iter = self.source.chars();
+        let rank = match source_iter.nth(self.index.into()) {
+            Some(rank @ 'a'..='h') => rank,
             _ => return Err(SanParseError::InvalidTargetSquare(None)),
         };
 
         let file = match source_iter.next() {
-            Some(file @ '1'..'8') => file,
+            Some(file @ '1'..='8') => file,
             _ => return Err(SanParseError::InvalidTargetSquare(None)),
         };
 

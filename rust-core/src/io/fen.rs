@@ -1,4 +1,4 @@
-use crate::core::{positions::Position, pieces::{Piece, PieceColor}};
+use crate::core::{position::Position, piece::{Piece, PieceColor}};
 use thiserror::Error;
 
 /// An error denoting the ways
