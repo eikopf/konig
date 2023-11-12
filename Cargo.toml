@@ -1,7 +1,14 @@
 [package]
+authors = ["Oliver Wooding <oliverwooding@icloud.com>"]
 name = "konig"
 version = "0.1.0"
 edition = "2021"
+readme = "README.md"
+repository = "https://github.com/eikopf/konig"
+license = "MIT"
+keywords = ["chess", "engine"]
+categories = ["games"]
+description = "A chess engine built to support variants and custom implementations."
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
