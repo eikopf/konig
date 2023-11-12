@@ -1,4 +1,5 @@
-# Zigzag
+# Konig
+> *König*
 
 A Rust-based chess engine, built to support custom implementations and chess variants.
 
@@ -7,4 +8,4 @@ A Rust-based chess engine, built to support custom implementations and chess var
 `TODO`
 
 ## Notes
-This project was previously implemented in Zig (hence the name), but I ultimately felt that the state of the Zig ecosystem was too spartan for a large project, and I feel much more able to complete the project in Rust.
+This project was previously implemented in Zig, but I ultimately felt that the state of the Zig ecosystem was too spartan for a large project, and I feel much more able to complete the project in Rust.
