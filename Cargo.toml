@@ -1,5 +1,5 @@
 [package]
-name = "zigzag"
+name = "konig"
 version = "0.1.0"
 edition = "2021"
 
