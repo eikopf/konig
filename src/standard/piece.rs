@@ -3,17 +3,29 @@ use crate::core::piece::Piece;
 /// Represents the standard set of chess pieces.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum StandardPiece {
+    /// A black pawn.
     BlackPawn,
+    /// A black rook.
     BlackRook,
+    /// A black knight.
     BlackKnight,
+    /// A black bishop.
     BlackBishop,
+    /// A black queen.
     BlackQueen,
+    /// A black king.
     BlackKing,
+    /// A white pawn.
     WhitePawn,
+    /// A white rook.
     WhiteRook,
+    /// A white knight.
     WhiteKnight,
+    /// A white bishop.
     WhiteBishop,
+    /// A white queen.
     WhiteQueen,
+    /// A white king.
     WhiteKing,
 }
 
@@ -61,6 +73,7 @@ impl Into<char> for StandardPiece {
 }
 
 impl StandardPiece {
+    /// Converts `self` into the corresponding UTF-8 [`char`].
     pub fn into_utf8_chess_symbol(self) -> char {
         match self {
             Self::WhiteKing => '\u{2654}',

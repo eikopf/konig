@@ -39,12 +39,14 @@ impl<'a> TryFrom<&'a str> for StandardIndex {
     type Error = IndexError<&'a str>;
 
     fn try_from(value: &'a str) -> Result<Self, Self::Error> {
+        // TODO: complete function
         todo!()
     }
 }
 
 impl<'a> Into<&'a str> for StandardIndex {
     fn into(self) -> &'a str {
+        // TODO: complete function
         todo!()
     }
 }

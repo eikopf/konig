@@ -2,14 +2,22 @@
 
 use super::index::Index;
 use super::piece::Piece;
-use super::r#move::Move;
+use super::r#move::{LegalMove, Move};
 use std::error::Error;
 
+/// Represents a chessboard at the highest level, as an
+/// object that can modify itself based on a legal move,
+/// and which can determine whether a given move is legal.
 pub trait Board: Default + std::ops::Index<Self::Index> {
+    /// This error is returned if a move cannot be validated.
     type IllegalMoveError: Error;
+    /// Represents a specific place on the board.
     type Index: Index<Board = Self>;
-    type LegalMove: Move<Board = Self, Piece = Self::Piece>;
-    type Move: Move<Board = Self, Piece = Self::Piece>;
+    /// Represents a move on the board which is known to be legal.
+    type LegalMove: LegalMove<Board = Self>;
+    /// Represents an arbitrary move on the board, which may be illegal.
+    type Move: Move<Board = Self>;
+    /// Represents the pieces which may be on the board.
     type Piece: Piece;
 
     /// Applies the given LegalMove, and returns the new state of the board.

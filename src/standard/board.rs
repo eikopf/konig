@@ -150,7 +150,8 @@ impl<'a> IntoIterator for &'a StandardBoard {
 }
 
 impl<'a> StandardBoard {
-    fn rank_iter(&'a self) -> StandardBoardRankIterator<'a> {
+    /// Returns an iterator over the ranks of `self`, from white to black.
+    pub fn rank_iter(&'a self) -> StandardBoardRankIterator<'a> {
         StandardBoardRankIterator::from(self)
     }
 }
