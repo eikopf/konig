@@ -1,9 +1,47 @@
-use super::r#move::{IllegalStandardMoveError, LegalStandardMove, StandardMove};
+use std::slice::ChunksExact;
+
+use super::{
+    index::StandardIndex,
+    r#move::{IllegalStandardMoveError, LegalStandardMove, StandardMove},
+};
+
 use crate::{core::board::Board, standard::piece::StandardPiece};
-use std::num::NonZeroU8;
+
+/// Represents the implicit state of a standard
+/// 8x8 chess board, i.e. the information that
+/// cannot be derived solely from the current
+/// state of the pieces on the board.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct StandardBoardState {
+    // TODO: replace with better types
+    white_turn: bool,
+    castling_rights: [bool; 4], // clockwise from the bottom-right on a per-rook basis
+    en_passant_square: Option<StandardIndex>,
+}
+
+impl Default for StandardBoardState {
+    fn default() -> Self {
+        Self {
+            white_turn: true,
+            castling_rights: [true, true, true, true],
+            en_passant_square: None,
+        }
+    }
+}
+
+/// Represents a standard 8x8 chess board.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StandardBoard {
+    // pieces
+    pieces: [Option<StandardPiece>; 64],
+
+    // essential state
+    state: StandardBoardState,
+}
 
 impl Board for StandardBoard {
     type IllegalMoveError = IllegalStandardMoveError;
+    type Index = StandardIndex;
     type LegalMove = LegalStandardMove;
     type Move = StandardMove;
     type Piece = StandardPiece;
@@ -15,17 +53,6 @@ impl Board for StandardBoard {
     fn validate(&self, candidate: Self::Move) -> Result<Self::LegalMove, Self::IllegalMoveError> {
         todo!()
     }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct StandardBoard {
-    // pieces
-    pieces: [Option<StandardPiece>; 64],
-
-    // game state
-    white_turn: bool,
-    castling_rights: [bool; 4], // right-to-left, then white-to-black, tracks castling rights per rook
-    en_passant_square: Option<NonZeroU8>,
 }
 
 impl Default for StandardBoard {
@@ -97,14 +124,38 @@ impl Default for StandardBoard {
                 Some(StandardPiece::BlackKnight),
                 Some(StandardPiece::BlackRook),
             ],
-            white_turn: true,
-            castling_rights: [true, true, true, true],
-            en_passant_square: None,
+            state: StandardBoardState::default(),
         }
     }
 }
 
-/// Provides a simple forward iterator over the pieces on a `StandardBoard`.
+impl std::ops::Index<<Self as Board>::Index> for StandardBoard {
+    type Output = Option<<Self as Board>::Piece>;
+
+    fn index(&self, index: <Self as Board>::Index) -> &Self::Output {
+        &self.pieces[<StandardIndex as Into<usize>>::into(index)]
+    }
+}
+
+impl<'a> IntoIterator for &'a StandardBoard {
+    type Item = Option<<StandardBoard as Board>::Piece>;
+    type IntoIter = StandardBoardIterator<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        Self::IntoIter {
+            board: &self,
+            index: 0,
+        }
+    }
+}
+
+impl<'a> StandardBoard {
+    fn rank_iter(&'a self) -> StandardBoardRankIterator<'a> {
+        StandardBoardRankIterator::from(self)
+    }
+}
+
+/// Linear iterator over the pieces on a `StandardBoard`.
 pub struct StandardBoardIterator<'a> {
     board: &'a StandardBoard,
     index: usize, // alignment makes u8 and usize take the same space
@@ -130,13 +181,38 @@ impl<'a> ExactSizeIterator for StandardBoardIterator<'a> {
     }
 }
 
-impl<'a> IntoIterator for &'a StandardBoard {
-    type Item = Option<<StandardBoard as Board>::Piece>;
-    type IntoIter = StandardBoardIterator<'a>;
+/// Linear iterator over the ranks on a `StandardBoard`.
+pub struct StandardBoardRankIterator<'a> {
+    chunk_iter: ChunksExact<'a, Option<StandardPiece>>,
+    index: usize,
+}
 
-    fn into_iter(self) -> Self::IntoIter {
-        Self::IntoIter {
-            board: &self,
+impl<'a> Iterator for StandardBoardRankIterator<'a> {
+    type Item = &'a [Option<StandardPiece>];
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let result = self.chunk_iter.next();
+        self.index += 1;
+        result
+    }
+}
+
+impl<'a> ExactSizeIterator for StandardBoardRankIterator<'a> {
+    fn len(&self) -> usize {
+        8 - self.index
+    }
+}
+
+impl<'a> DoubleEndedIterator for StandardBoardRankIterator<'a> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.chunk_iter.next_back()
+    }
+}
+
+impl<'a> From<&'a StandardBoard> for StandardBoardRankIterator<'a> {
+    fn from(value: &'a StandardBoard) -> Self {
+        Self {
+            chunk_iter: value.pieces.chunks_exact(8),
             index: 0,
         }
     }
@@ -233,5 +309,17 @@ mod tests {
 
         // end of iterator
         assert_eq!(board_iter.next(), None);
+    }
+
+    #[test]
+    fn std_ops_index_into_standard_board_is_correct() {
+        let board = StandardBoard::default();
+        let i = StandardIndex::try_from(0).unwrap();
+        let j = StandardIndex::try_from(63).unwrap();
+        let k = StandardIndex::try_from(33).unwrap();
+
+        assert_eq!(board[i], Some(StandardPiece::WhiteRook));
+        assert_eq!(board[j], Some(StandardPiece::BlackRook));
+        assert_eq!(board[k], None);
     }
 }

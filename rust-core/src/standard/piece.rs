@@ -59,3 +59,22 @@ impl Into<char> for StandardPiece {
         }
     }
 }
+
+impl StandardPiece {
+    pub fn into_utf8_chess_symbol(self) -> char {
+        match self {
+            Self::WhiteKing => '\u{2654}',
+            Self::WhiteQueen => '\u{2655}',
+            Self::WhiteRook => '\u{2656}',
+            Self::WhiteBishop => '\u{2657}',
+            Self::WhiteKnight => '\u{2658}',
+            Self::WhitePawn => '\u{2659}',
+            Self::BlackKing => '\u{265A}',
+            Self::BlackQueen => '\u{265B}',
+            Self::BlackRook => '\u{265C}',
+            Self::BlackBishop => '\u{265D}',
+            Self::BlackKnight => '\u{265E}',
+            Self::BlackPawn => '\u{265F}',
+        }
+    }
+}

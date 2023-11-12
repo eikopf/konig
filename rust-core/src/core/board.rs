@@ -1,9 +1,13 @@
+//! An abstract `Board` trait.
+
+use super::index::Index;
 use super::piece::Piece;
 use super::r#move::Move;
 use std::error::Error;
 
-pub trait Board: Default {
+pub trait Board: Default + std::ops::Index<Self::Index> {
     type IllegalMoveError: Error;
+    type Index: Index<Board = Self>;
     type LegalMove: Move<Board = Self, Piece = Self::Piece>;
     type Move: Move<Board = Self, Piece = Self::Piece>;
     type Piece: Piece;

@@ -1,3 +1,5 @@
+//! An abstract `Index` trait.
+
 use super::board::Board;
 use thiserror::Error;
 
@@ -9,10 +11,6 @@ pub enum IndexError<T> {
     InvalidFormat(T),
 }
 
-pub trait Index {
+pub trait Index: Into<usize> {
     type Board: Board;
-
-    // indexes into the provided board and returns a reference
-    // to the piece at the corresponding position
-    fn get_in(self, board: &Self::Board) -> &<Self::Board as Board>::Piece;
 }

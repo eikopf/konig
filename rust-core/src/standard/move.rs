@@ -12,12 +12,15 @@ pub enum IllegalStandardMoveError {
     InvalidTarget(StandardIndex),
 }
 
+/// Represents a possible move on a `StandardBoard`,
+/// including illegal moves.
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub struct StandardMove {
     source: StandardIndex,
     target: StandardIndex,
 }
 
+/// Represents a legal move on a `StandardBoard`.
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub struct LegalStandardMove(StandardMove);
 
