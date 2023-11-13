@@ -80,7 +80,7 @@ impl Default for CastlingPermissions {
 /// from parsing a valid FEN string.
 #[derive(Debug, PartialEq, Eq)]
 pub struct FenData {
-    pieces: [StandardPiece; 64],
+    pieces: [Option<StandardPiece>; 64],
     white_to_move: bool,
     castling_permissions: CastlingPermissions,
     en_passant_square: Option<StandardIndex>,
@@ -88,7 +88,16 @@ pub struct FenData {
     fullmove_counter: u16,
 }
 
-struct FenBoard {}
+impl Default for FenData {
+    fn default() -> Self {
+        todo!()
+    }
+}
+
+/// Wraps a [`FenData`] to provide an `impl [StaticBoard]`.
+struct FenBoard {
+    data: FenData,
+}
 
 impl StaticBoard for FenBoard {
     type Index = StandardIndex;
@@ -97,24 +106,31 @@ impl StaticBoard for FenBoard {
 
 impl Default for FenBoard {
     fn default() -> Self {
-        // TODO: implement fen board default correctly
-        Self {}
+        Self {
+            data: FenData::default(),
+        }
+    }
+}
+
+impl From<FenData> for FenBoard {
+    fn from(value: FenData) -> Self {
+        Self { data: value }
     }
 }
 
 impl std::ops::Index<StandardIndex> for FenBoard {
-    // TODO: implement fen board indexing correctly
-    type Output = ();
+    type Output = Option<StandardPiece>;
 
     fn index(&self, index: StandardIndex) -> &Self::Output {
-        todo!()
+        let i: usize = index.into();
+        &self.data.pieces[i]
     }
 }
 
 impl FenData {
-    /// Returns a relevant subset of FenData as a Board
-    pub fn into_board(&self) -> impl StaticBoard {
-        FenBoard::default()
+    /// Returns a relevant subset of [`FenData`] as a [`StaticBoard`].
+    pub fn as_static_board(self) -> impl StaticBoard {
+        FenBoard::from(self)
     }
 }
 
