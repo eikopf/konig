@@ -1,9 +1,6 @@
 use super::{board::StandardBoard, index::StandardIndex};
-use crate::core::r#move::{LegalMove, Move};
+use crate::core::r#move::{IllegalMoveError, LegalMove, Move};
 use thiserror::Error;
-
-// TODO: create an IllegalMoveError trait
-// TODO: generalize the Move -> LegalMove relationship with traits
 
 /// Results when a [`StandardMove`] cannot be converted into a [`LegalStandardMove`]
 #[derive(Debug, Error)]
@@ -17,6 +14,12 @@ pub enum IllegalStandardMoveError {
     /// Results when a [`StandardMove`] is illegal because it has an invalid target index.
     #[error("Invalid move target: {0:?}")]
     InvalidTarget(StandardIndex),
+}
+
+impl IllegalMoveError for IllegalStandardMoveError {
+    type Board = StandardBoard;
+    type Move = StandardMove;
+    type LegalMove = LegalStandardMove;
 }
 
 /// Represents a possible move on a `StandardBoard`,
@@ -38,4 +41,13 @@ impl Move for StandardMove {
 impl LegalMove for LegalStandardMove {
     type Board = StandardBoard;
     type Move = StandardMove;
+}
+
+impl From<(StandardIndex, StandardIndex)> for StandardMove {
+    fn from(value: (StandardIndex, StandardIndex)) -> Self {
+        Self {
+            source: value.0,
+            target: value.1,
+        }
+    }
 }

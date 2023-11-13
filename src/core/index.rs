@@ -5,7 +5,7 @@ use thiserror::Error;
 
 /// The result of the incorrect creation or usage of
 /// a particular index.
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Eq, PartialEq)]
 pub enum IndexError<T> {
     /// The result of using a valid index in an invalid context.
     #[error("Received an out-of-bounds index: {0}")]
@@ -16,7 +16,7 @@ pub enum IndexError<T> {
 }
 
 /// Represents a particular place on the associated [`Board`]
-pub trait Index: Into<usize> {
+pub trait Index: Into<usize> + TryFrom<usize> {
     /// A [`Board`] indexed by this index.
     type Board: Board<Index = Self>;
 }

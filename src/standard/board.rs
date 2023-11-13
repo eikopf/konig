@@ -13,7 +13,6 @@ use crate::{core::board::Board, standard::piece::StandardPiece};
 /// state of the pieces on the board.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct StandardBoardState {
-    // TODO: replace with better types
     white_turn: bool,
     castling_rights: [bool; 4], // clockwise from the bottom-right on a per-rook basis
     en_passant_square: Option<StandardIndex>,
@@ -315,9 +314,9 @@ mod tests {
     #[test]
     fn std_ops_index_into_standard_board_is_correct() {
         let board = StandardBoard::default();
-        let i = StandardIndex::try_from(0).unwrap();
-        let j = StandardIndex::try_from(63).unwrap();
-        let k = StandardIndex::try_from(33).unwrap();
+        let i = StandardIndex::try_from(0u8).unwrap();
+        let j = StandardIndex::try_from(63u8).unwrap();
+        let k = StandardIndex::try_from(33u8).unwrap();
 
         assert_eq!(board[i], Some(StandardPiece::WhiteRook));
         assert_eq!(board[j], Some(StandardPiece::BlackRook));
