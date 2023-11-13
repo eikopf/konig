@@ -2,13 +2,13 @@ use crate::core::index::{Index, IndexError};
 use crate::standard::board::StandardBoard;
 use std::ops::Deref;
 
+// TODO: make standard index use nonmax::NonMaxU8
+
 /// Represents a specific square on a `StandardBoard`
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub struct StandardIndex(u8);
 
-impl Index for StandardIndex {
-    type Board = StandardBoard;
-}
+impl Index for StandardIndex {}
 
 impl Deref for StandardIndex {
     type Target = u8;

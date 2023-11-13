@@ -4,5 +4,5 @@
 #![warn(missing_docs)]
 
 pub mod core;
-//pub mod io; // disabled temporarily while refactoring
+pub mod io;
 pub mod standard;

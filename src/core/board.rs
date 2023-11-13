@@ -4,14 +4,28 @@ use super::index::Index;
 use super::piece::Piece;
 use super::r#move::{IllegalMoveError, LegalMove, Move};
 
+/// Represents a static view into a single board position, with
+/// no notion of moves.
+pub trait StaticBoard: Default + std::ops::Index<Self::Index> {
+    /// Represents a specific place on the board.
+    type Index: Index;
+    /// Represents the pieces which may be on the board.
+    type Piece: Piece;
+
+    /// A simple constructor yielding the default position.
+    fn new() -> Self {
+        Self::default()
+    }
+}
+
 /// Represents a chessboard at the highest level, as an
 /// object that can modify itself based on a legal move,
 /// and which can determine whether a given move is legal.
-pub trait Board: Default + std::ops::Index<Self::Index> {
+pub trait Board: StaticBoard {
     /// This error is returned if a move cannot be validated.
     type IllegalMoveError: IllegalMoveError;
     /// Represents a specific place on the board.
-    type Index: Index<Board = Self>;
+    type Index: Index;
     /// Represents a move on the board which is known to be legal.
     type LegalMove: LegalMove<Board = Self>;
     /// Represents an arbitrary move on the board, which may be illegal.
@@ -41,9 +55,10 @@ pub trait Board: Default + std::ops::Index<Self::Index> {
         let legal_move = self.validate(candidate)?;
         Ok(self.process(legal_move))
     }
+}
 
-    /// A simple constructor yielding the default position.
-    fn new() -> Self {
-        Self::default()
-    }
+// blanket impl over all boards
+impl<T: Board> StaticBoard for T {
+    type Index = <Self as Board>::Index;
+    type Piece = <Self as Board>::Piece;
 }
