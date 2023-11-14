@@ -1,4 +1,5 @@
 use crate::core::board::StaticBoard;
+use crate::standard::board::StandardCastlingPermissions;
 use crate::standard::index::StandardIndex;
 use crate::standard::piece::StandardPiece;
 
@@ -40,49 +41,13 @@ pub enum FenParseError {
     TooManyFields,
 }
 
-// TODO: move castling permissions to crate::standard::board
-
-/// Represents the possible castling
-/// permissions described by a FEN
-/// string.
-#[derive(Debug, PartialEq, Eq)]
-pub struct CastlingPermissions {
-    white_king_side: bool,
-    white_queen_side: bool,
-    black_king_side: bool,
-    black_queen_side: bool,
-}
-
-impl CastlingPermissions {
-    /// Convienience function for the empty set of castling permissions.
-    pub fn none() -> CastlingPermissions {
-        CastlingPermissions {
-            white_king_side: false,
-            white_queen_side: false,
-            black_king_side: false,
-            black_queen_side: false,
-        }
-    }
-}
-
-impl Default for CastlingPermissions {
-    fn default() -> Self {
-        Self {
-            white_king_side: true,
-            white_queen_side: true,
-            black_king_side: true,
-            black_queen_side: true,
-        }
-    }
-}
-
 /// Represents the data derived
 /// from parsing a valid FEN string.
 #[derive(Debug, PartialEq, Eq)]
 pub struct FenData {
     pieces: [Option<StandardPiece>; 64],
     white_to_move: bool,
-    castling_permissions: CastlingPermissions,
+    castling_permissions: StandardCastlingPermissions,
     en_passant_square: Option<StandardIndex>,
     halfmove_clock: u8,
     fullmove_counter: u16,
@@ -91,6 +56,37 @@ pub struct FenData {
 impl Default for FenData {
     fn default() -> Self {
         todo!()
+    }
+}
+
+impl TryFrom<&str> for FenData {
+    type Error = FenParseError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        let mut source_iter = value.split(' ');
+        let source_len = source_iter.clone().count();
+
+        if source_len < 6 {
+            return Err(FenParseError::TooFewFields);
+        } else if source_len > 6 {
+            return Err(FenParseError::TooManyFields);
+        }
+
+        Ok(Self {
+            pieces: try_parse_piece_placement(source_iter.next().unwrap())?,
+            white_to_move: try_parse_side_to_move(source_iter.next().unwrap())?,
+            castling_permissions: try_parse_castling_permissions(source_iter.next().unwrap())?,
+            en_passant_square: try_parse_en_passant_square(source_iter.next().unwrap())?,
+            halfmove_clock: try_parse_halfmove_clock(source_iter.next().unwrap())?,
+            fullmove_counter: try_parse_fullmove_counter(source_iter.next().unwrap())?,
+        })
+    }
+}
+
+impl FenData {
+    /// Returns a relevant subset of [`FenData`] as a [`StaticBoard`].
+    pub fn as_static_board(self) -> impl StaticBoard {
+        FenBoard::from(self)
     }
 }
 
@@ -127,38 +123,31 @@ impl std::ops::Index<StandardIndex> for FenBoard {
     }
 }
 
-impl FenData {
-    /// Returns a relevant subset of [`FenData`] as a [`StaticBoard`].
-    pub fn as_static_board(self) -> impl StaticBoard {
-        FenBoard::from(self)
-    }
+fn try_parse_piece_placement(source: &str) -> Result<[Option<StandardPiece>; 64], FenParseError> {
+    todo!()
 }
 
-// impl TryFrom<&str> for FenData {
-//     type Error = FenParseError;
+fn try_parse_side_to_move(source: &str) -> Result<bool, FenParseError> {
+    todo!()
+}
 
-//     fn try_from(value: &str) -> Result<Self, Self::Error> {
-//         if value.split(' ').count() > 6 {
-//             return Err(FenParseError::TooManyFields);
-//         }
+fn try_parse_castling_permissions(
+    source: &str,
+) -> Result<StandardCastlingPermissions, FenParseError> {
+    todo!()
+}
 
-//         let mut source_iterator = value.split(' ');
-//         let ret = || return FenParseError::TooFewFields;
+fn try_parse_en_passant_square(source: &str) -> Result<Option<StandardIndex>, FenParseError> {
+    todo!()
+}
 
-//         Ok(FenData {
-//             position: try_parse_piece_placement(source_iterator.next().ok_or_else(ret)?)?,
-//             side_to_move: try_parse_side_to_move(source_iterator.next().ok_or_else(ret)?)?,
-//             castling_permissions: try_parse_castling_permissions(
-//                 source_iterator.next().ok_or_else(ret)?,
-//             )?,
-//             en_passant_target_square: try_parse_en_passant_target_square(
-//                 source_iterator.next().ok_or_else(ret)?,
-//             )?,
-//             halfmove_clock: try_parse_halfmove_clock(source_iterator.next().ok_or_else(ret)?)?,
-//             fullmove_counter: try_parse_fullmove_counter(source_iterator.next().ok_or_else(ret)?)?,
-//         })
-//     }
-// }
+fn try_parse_halfmove_clock(source: &str) -> Result<u8, FenParseError> {
+    todo!()
+}
+
+fn try_parse_fullmove_counter(source: &str) -> Result<u16, FenParseError> {
+    todo!()
+}
 
 // /// Parses the "Piece placement" (1st) component
 // /// of a FEN string, returning a valid `Position`

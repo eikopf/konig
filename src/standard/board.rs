@@ -7,6 +7,38 @@ use super::{
 
 use crate::{core::board::Board, standard::piece::StandardPiece};
 
+/// Represents the possible castling permissions described by a FEN string.
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub struct StandardCastlingPermissions {
+    white_king_side: bool,
+    white_queen_side: bool,
+    black_king_side: bool,
+    black_queen_side: bool,
+}
+
+impl StandardCastlingPermissions {
+    /// Convienience function for the empty set of castling permissions.
+    pub fn none() -> StandardCastlingPermissions {
+        StandardCastlingPermissions {
+            white_king_side: false,
+            white_queen_side: false,
+            black_king_side: false,
+            black_queen_side: false,
+        }
+    }
+}
+
+impl Default for StandardCastlingPermissions {
+    fn default() -> Self {
+        Self {
+            white_king_side: true,
+            white_queen_side: true,
+            black_king_side: true,
+            black_queen_side: true,
+        }
+    }
+}
+
 /// Represents the implicit state of a standard
 /// 8x8 chess board, i.e. the information that
 /// cannot be derived solely from the current
@@ -14,7 +46,7 @@ use crate::{core::board::Board, standard::piece::StandardPiece};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct StandardBoardState {
     white_turn: bool,
-    castling_rights: [bool; 4], // clockwise from the bottom-right on a per-rook basis
+    castling_rights: StandardCastlingPermissions,
     en_passant_square: Option<StandardIndex>,
 }
 
@@ -22,7 +54,7 @@ impl Default for StandardBoardState {
     fn default() -> Self {
         Self {
             white_turn: true,
-            castling_rights: [true, true, true, true],
+            castling_rights: StandardCastlingPermissions::default(),
             en_passant_square: None,
         }
     }
@@ -31,10 +63,7 @@ impl Default for StandardBoardState {
 /// Represents a standard 8x8 chess board.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct StandardBoard {
-    // pieces
     pieces: [Option<StandardPiece>; 64],
-
-    // essential state
     state: StandardBoardState,
 }
 
