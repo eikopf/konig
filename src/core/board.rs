@@ -6,7 +6,7 @@ use super::r#move::{IllegalMoveError, LegalMove, Move};
 
 /// Represents a static view into a single board position, with
 /// no notion of moves.
-pub trait StaticBoard: Default + std::ops::Index<Self::Index> {
+pub trait StaticBoard: Default + std::fmt::Debug + std::ops::Index<Self::Index> {
     /// Represents a specific place on the board.
     type Index: Index;
     /// Represents the pieces which may be on the board.

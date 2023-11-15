@@ -10,10 +10,10 @@ use crate::{core::board::Board, standard::piece::StandardPiece};
 /// Represents the possible castling permissions described by a FEN string.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct StandardCastlingPermissions {
-    white_king_side: bool,
-    white_queen_side: bool,
-    black_king_side: bool,
-    black_queen_side: bool,
+    pub white_king_side: bool,
+    pub white_queen_side: bool,
+    pub black_king_side: bool,
+    pub black_queen_side: bool,
 }
 
 impl StandardCastlingPermissions {

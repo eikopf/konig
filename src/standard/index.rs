@@ -1,5 +1,4 @@
 use crate::core::index::{Index, IndexError};
-use crate::standard::board::StandardBoard;
 use std::ops::Deref;
 
 // TODO: make standard index use nonmax::NonMaxU8
