@@ -7,11 +7,11 @@ use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{digit1, one_of, u16, u8};
 use nom::combinator::opt;
-use nom::error::{Error, ParseError};
+use nom::error::{Error, ErrorKind, ParseError};
 use nom::multi::{many_m_n, separated_list1};
 use nom::sequence::pair;
 use nom::sequence::Tuple;
-use nom::IResult;
+use nom::{Finish, IResult};
 use thiserror::Error;
 
 /// Represents the ways in which a FEN string may be invalid.
@@ -70,12 +70,14 @@ impl Default for FenData {
     }
 }
 
-impl TryFrom<&str> for FenData {
-    type Error = FenParseError;
+impl<'a> TryFrom<&'a str> for FenData {
+    type Error = nom::error::Error<&'a str>;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        // TODO: impl using nom
-        todo!()
+    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
+        match parse_fen_string(value).finish() {
+            Ok((_, data)) => Ok(data),
+            Err(err) => Err(err),
+        }
     }
 }
 
