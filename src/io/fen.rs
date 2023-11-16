@@ -1,4 +1,4 @@
-use crate::core::board::StaticBoard;
+use crate::core::board::Board;
 use crate::standard::board::StandardCastlingPermissions;
 use crate::standard::index::StandardIndex;
 use crate::standard::piece::StandardPiece;
@@ -54,7 +54,7 @@ type PieceArray = [Option<StandardPiece>; 64];
 
 /// Represents the data derived
 /// from parsing a valid FEN string.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct FenData {
     pieces: PieceArray,
     white_to_move: bool,
@@ -82,19 +82,19 @@ impl<'a> TryFrom<&'a str> for FenData {
 }
 
 impl FenData {
-    /// Returns a relevant subset of [`FenData`] as a [`StaticBoard`].
-    pub fn as_static_board(self) -> impl StaticBoard<Index = StandardIndex, Piece = StandardPiece> {
+    /// Returns a relevant subset of [`FenData`] as a [`FenBoard`].
+    pub fn as_board(self) -> FenBoard {
         FenBoard::from(self)
     }
 }
 
 /// Wraps a [`FenData`] to provide an `impl [StaticBoard]`.
 #[derive(Debug, PartialEq, Eq)]
-struct FenBoard {
+pub struct FenBoard {
     data: FenData,
 }
 
-impl StaticBoard for FenBoard {
+impl Board for FenBoard {
     type Index = StandardIndex;
     type Piece = StandardPiece;
 }
@@ -110,6 +110,16 @@ impl Default for FenBoard {
 impl From<FenData> for FenBoard {
     fn from(value: FenData) -> Self {
         Self { data: value }
+    }
+}
+
+impl<'a> IntoIterator for &'a FenBoard {
+    type Item = &'a Option<StandardPiece>;
+
+    type IntoIter = std::slice::Iter<'a, Option<StandardPiece>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.data.pieces.iter()
     }
 }
 
@@ -330,13 +340,18 @@ mod tests {
         let default = StandardBoard::default();
 
         // for each position on the board, check that the pieces match
-        for i in 0..=63 {
-            let index = StandardIndex::try_from(i).unwrap();
-            println!("{:?}", data.pieces[i]);
-            println!("{:?}", default[index]);
-            // assert_eq!(data.as_static_board()[index], default[index])
-        }
+        default
+            .into_iter()
+            .zip(data.clone().as_board().into_iter())
+            .for_each(|(a, b)| assert_eq!(a, *b));
 
-        assert!(false);
+        assert_eq!(data.white_to_move, true);
+        assert_eq!(
+            data.castling_permissions,
+            StandardCastlingPermissions::default()
+        );
+        assert_eq!(data.en_passant_square, None);
+        assert_eq!(data.halfmove_clock, 0);
+        assert_eq!(data.fullmove_counter, 1);
     }
 }

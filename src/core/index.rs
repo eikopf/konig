@@ -1,6 +1,5 @@
 //! An abstract `Index` trait.
 
-use super::board::StaticBoard;
 use thiserror::Error;
 
 /// The result of the incorrect creation or usage of
