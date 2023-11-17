@@ -10,7 +10,7 @@ use super::r#move::{IllegalMoveError, LegalMove, Move};
 /// For a notion of legality see [`Validate`].
 ///
 /// For a notion of moves acting on state, see [`Process`].
-pub trait Board: Default + std::fmt::Debug + std::ops::Index<Self::Index> {
+pub trait Board: std::fmt::Debug {
     /// Represents a specific place on the board.
     type Index: Index;
     /// Represents the pieces which may be on the board.

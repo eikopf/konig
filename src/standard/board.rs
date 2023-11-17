@@ -6,19 +6,20 @@ use super::{
 };
 
 use crate::{
-    core::{
-        board::{Board, Process, Validate},
-        r#move::LegalMove,
-    },
+    core::board::{Board, Process, Validate},
     standard::piece::StandardPiece,
 };
 
 /// Represents the possible castling permissions described by a FEN string.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct StandardCastlingPermissions {
+    /// Whether or not castling on the bottom-right is allowed.
     pub white_king_side: bool,
+    /// Whether or not castling on the bottom-left is allowed.
     pub white_queen_side: bool,
+    /// Whether or not castling on the top-right is allowed.
     pub black_king_side: bool,
+    /// Whether or not castling on the top-left is allowed.
     pub black_queen_side: bool,
 }
 

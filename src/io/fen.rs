@@ -6,10 +6,7 @@ use crate::standard::piece::StandardPiece;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{digit1, one_of, u16, u8};
-use nom::combinator::opt;
-use nom::error::{Error, ErrorKind, ParseError};
 use nom::multi::{many_m_n, separated_list1};
-use nom::sequence::pair;
 use nom::sequence::Tuple;
 use nom::{Finish, IResult};
 use thiserror::Error;
@@ -140,11 +137,12 @@ impl std::ops::Index<StandardIndex> for FenBoard {
 /// [`FenData`]'s [`TryFrom`] implementation.
 fn parse_fen_string(source: &str) -> IResult<&str, FenData> {
     // piece placement grammar
-    let digit17 = one_of::<&str, &str, nom::error::Error<_>>("1234567");
-    let white_piece = one_of("PNBRQK");
-    let black_piece = one_of("pnbrqk");
-    let piece = alt((white_piece, black_piece));
-    let rank_component = pair(opt(digit17), piece);
+    // let digit17 = one_of::<&str, &str, nom::error::Error<_>>("1234567");
+    // let white_piece = one_of("PNBRQK");
+    // let black_piece = one_of("pnbrqk");
+    // let piece = alt((white_piece, black_piece));
+    // let rank_component = pair(opt(digit17), piece);
+    // TODO: implement this with more accurate parsing
     let rank = many_m_n(1, 8, one_of("12345678pnbrqkPNBRQK"));
     let piece_placement = separated_list1(tag("/"), rank);
 
