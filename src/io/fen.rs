@@ -3,15 +3,15 @@ use crate::core::index::Index;
 use crate::core::piece::Piece;
 use crate::standard::board::StandardCastlingPermissions;
 use crate::standard::index::StandardIndex;
-use crate::standard::piece::StandardPiece;
+use crate::standard::piece::{StandardColor, StandardPiece, StandardPieceKind};
 
 use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::character::complete::{digit1, one_of, u16, u8};
-use nom::combinator::{map_parser, opt};
+use nom::character::complete::{one_of, u16, u8};
+use nom::combinator::opt;
 use nom::multi::{many_m_n, separated_list1};
 use nom::sequence::{pair, Tuple};
-use nom::{Finish, IResult, Parser};
+use nom::{Finish, IResult};
 use thiserror::Error;
 
 /// Represents the ways in which a FEN string may be invalid.
@@ -50,7 +50,7 @@ pub enum FenParseError {
     TooManyFields,
 }
 
-type PieceArray = [Option<StandardPiece>; 64];
+type PieceArray = [Option<FenPiece>; 64];
 
 /// Represents the data derived
 /// from parsing a valid FEN string.
@@ -85,7 +85,7 @@ impl<'a> TryFrom<&'a str> for FenData {
 
 impl FenData {
     /// Returns the board described by this [`FenData`].
-    pub fn as_board(self) -> impl Board<Piece = StandardPiece, Index = StandardIndex> {
+    pub fn as_board(self) -> impl Board<Piece = FenPiece, Index = FenIndex> {
         FenBoard::from(self)
     }
 }
@@ -97,8 +97,8 @@ struct FenBoard {
 }
 
 impl Board for FenBoard {
-    type Index = StandardIndex;
-    type Piece = StandardPiece;
+    type Index = FenIndex;
+    type Piece = FenPiece;
 
     fn get_piece_at(&self, index: Self::Index) -> Option<&Self::Piece> {
         self.data.pieces[usize::from(index)].as_ref()
@@ -119,22 +119,96 @@ impl From<FenData> for FenBoard {
     }
 }
 
-impl<'a> IntoIterator for &'a FenBoard {
-    type Item = &'a Option<StandardPiece>;
+/// The index type into the return type of [`FenData`]'s `as_board` method.
+pub struct FenIndex(StandardIndex);
 
-    type IntoIter = std::slice::Iter<'a, Option<StandardPiece>>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.data.pieces.iter()
+impl From<StandardIndex> for FenIndex {
+    fn from(value: StandardIndex) -> Self {
+        Self(value)
     }
 }
 
-impl std::ops::Index<StandardIndex> for FenBoard {
-    type Output = Option<StandardPiece>;
+impl From<FenIndex> for usize {
+    fn from(value: FenIndex) -> Self {
+        value.0.into()
+    }
+}
 
-    fn index(&self, index: StandardIndex) -> &Self::Output {
-        let i: usize = index.into();
-        &self.data.pieces[i]
+impl Index for FenIndex {
+    type MetricTarget = u8;
+
+    fn distance(a: Self, b: Self) -> Self::MetricTarget {
+        // TODO: complete this function
+        todo!()
+    }
+}
+
+/// The piece type in the return type of [`FenData`]'s `as_board` method.
+#[derive(Eq, PartialEq, Copy, Clone, Debug)]
+pub struct FenPiece(StandardPiece);
+
+impl From<StandardPiece> for FenPiece {
+    fn from(value: StandardPiece) -> Self {
+        Self(value)
+    }
+}
+
+impl From<FenPiece> for StandardPiece {
+    fn from(value: FenPiece) -> Self {
+        value.0
+    }
+}
+
+impl Piece for FenPiece {
+    type Color = FenColor;
+
+    type Kind = FenPieceKind;
+
+    fn color(&self) -> Self::Color {
+        self.0.color().into()
+    }
+
+    fn kind(&self) -> Self::Kind {
+        self.0.kind().into()
+    }
+
+    fn new(color: Self::Color, kind: Self::Kind) -> Self
+    where
+        Self: Sized,
+    {
+        Self(StandardPiece::new(color.into(), kind.into()))
+    }
+}
+
+/// The color type associated with a [`FenPiece`].
+#[derive(Eq, PartialEq, Debug)]
+pub struct FenColor(StandardColor);
+
+impl From<StandardColor> for FenColor {
+    fn from(value: StandardColor) -> Self {
+        Self(value)
+    }
+}
+
+impl From<FenColor> for StandardColor {
+    fn from(value: FenColor) -> Self {
+        value.0
+    }
+}
+
+/// The kind type associated with a [`FenPiece`].
+#[derive(Eq, PartialEq, Debug)]
+pub struct FenPieceKind(StandardPieceKind);
+
+impl From<StandardPieceKind> for FenPieceKind {
+    fn from(value: StandardPieceKind) -> Self {
+        Self(value)
+    }
+}
+
+impl From<FenPieceKind> for StandardPieceKind {
+    fn from(value: FenPieceKind) -> Self {
+        value.0
     }
 }
 
@@ -230,7 +304,7 @@ fn expand_piece_placement(source: Vec<Vec<char>>) -> PieceArray {
             match c {
                 blank @ '1'..='8' => i += blank.to_digit(10).unwrap() as usize,
                 piece @ _ => {
-                    pieces[i] = Some(StandardPiece::try_from(piece).unwrap());
+                    pieces[i] = Some(StandardPiece::try_from(piece).unwrap().into());
                     i += 1;
                 }
             }
@@ -364,9 +438,11 @@ mod tests {
         for i in 0..=63 {
             let index = StandardIndex::try_from(i as u8).unwrap();
             assert_eq!(
-                default.get_piece_at(index),
-                data.as_board().get_piece_at(index)
-            );
+                default.get_piece_at(index).map(|x| x.to_owned()),
+                data.as_board()
+                    .get_piece_at(index.into())
+                    .map(|x| x.to_owned().into())
+            )
         }
 
         assert_eq!(data.white_to_move, true);
@@ -392,9 +468,11 @@ mod tests {
         for i in 0..=63 {
             let index = StandardIndex::try_from(i as u8).unwrap();
             assert_eq!(
-                default.get_piece_at(index),
-                data.as_board().get_piece_at(index)
-            );
+                default.get_piece_at(index).map(|x| x.to_owned()),
+                data.as_board()
+                    .get_piece_at(index.into())
+                    .map(|x| x.to_owned().into())
+            )
         }
 
         assert_eq!(data.white_to_move, true);
@@ -412,8 +490,8 @@ mod tests {
 
         assert_eq!(
             data.as_board()
-                .get_piece_at(StandardIndex::try_from(28u8).unwrap()),
-            Some(&StandardPiece::WhitePawn)
+                .get_piece_at(StandardIndex::try_from(28u8).unwrap().into()),
+            Some(&StandardPiece::WhitePawn.into())
         );
         assert_eq!(data.white_to_move, false);
         assert_eq!(
@@ -432,18 +510,18 @@ mod tests {
         let (_, data) = parse_fen_string(move2).unwrap();
         assert_eq!(
             data.as_board()
-                .get_piece_at(StandardIndex::try_from(28u8).unwrap()),
-            Some(&StandardPiece::WhitePawn)
+                .get_piece_at(StandardIndex::try_from(28u8).unwrap().into()),
+            Some(&StandardPiece::WhitePawn.into())
         );
         assert_eq!(
             data.as_board()
-                .get_piece_at(StandardIndex::try_from(34u8).unwrap()),
-            Some(&StandardPiece::BlackPawn)
+                .get_piece_at(StandardIndex::try_from(34u8).unwrap().into()),
+            Some(&StandardPiece::BlackPawn.into())
         );
         assert_eq!(
             // check black pawn has properly moved
             data.as_board()
-                .get_piece_at(StandardIndex::try_from(50u8).unwrap()),
+                .get_piece_at(StandardIndex::try_from(50u8).unwrap().into()),
             None
         );
 
@@ -464,24 +542,24 @@ mod tests {
         let (_, data) = parse_fen_string(move3).unwrap();
         assert_eq!(
             data.as_board()
-                .get_piece_at(StandardIndex::try_from(28u8).unwrap()),
-            Some(&StandardPiece::WhitePawn)
+                .get_piece_at(StandardIndex::try_from(28u8).unwrap().into()),
+            Some(&StandardPiece::WhitePawn.into())
         );
         assert_eq!(
             data.as_board()
-                .get_piece_at(StandardIndex::try_from(34u8).unwrap()),
-            Some(&StandardPiece::BlackPawn)
+                .get_piece_at(StandardIndex::try_from(34u8).unwrap().into()),
+            Some(&StandardPiece::BlackPawn.into())
         );
         assert_eq!(
             // check black pawn has properly moved
             data.as_board()
-                .get_piece_at(StandardIndex::try_from(50u8).unwrap()),
+                .get_piece_at(StandardIndex::try_from(50u8).unwrap().into()),
             None
         );
         assert_eq!(
             data.as_board()
-                .get_piece_at(StandardIndex::try_from(21u8).unwrap()),
-            Some(&StandardPiece::WhiteKnight)
+                .get_piece_at(StandardIndex::try_from(21u8).unwrap().into()),
+            Some(&StandardPiece::WhiteKnight.into())
         );
 
         assert_eq!(data.white_to_move, false);
