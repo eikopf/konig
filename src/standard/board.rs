@@ -5,14 +5,21 @@ use super::{
     r#move::{IllegalStandardMoveError, LegalStandardMove, StandardMove},
 };
 
-use crate::{core::board::Board, standard::piece::StandardPiece};
+use crate::{
+    core::board::{Board, Process, Validate},
+    standard::piece::StandardPiece,
+};
 
 /// Represents the possible castling permissions described by a FEN string.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct StandardCastlingPermissions {
+    /// Whether or not castling on the bottom-right is allowed.
     pub white_king_side: bool,
+    /// Whether or not castling on the bottom-left is allowed.
     pub white_queen_side: bool,
+    /// Whether or not castling on the top-right is allowed.
     pub black_king_side: bool,
+    /// Whether or not castling on the top-left is allowed.
     pub black_queen_side: bool,
 }
 
@@ -68,17 +75,22 @@ pub struct StandardBoard {
 }
 
 impl Board for StandardBoard {
-    type IllegalMoveError = IllegalStandardMoveError;
     type Index = StandardIndex;
+    type Piece = StandardPiece;
+}
+
+impl Validate for StandardBoard {
     type LegalMove = LegalStandardMove;
     type Move = StandardMove;
-    type Piece = StandardPiece;
+    type ValidationError = IllegalStandardMoveError;
 
-    fn process(&mut self, candidate: Self::LegalMove) -> Self {
+    fn validate(&self, candidate: Self::Move) -> Result<Self::LegalMove, Self::ValidationError> {
         todo!()
     }
+}
 
-    fn validate(&self, candidate: Self::Move) -> Result<Self::LegalMove, Self::IllegalMoveError> {
+impl Process for StandardBoard {
+    fn process(&self, candidate: Self::LegalMove) -> Self {
         todo!()
     }
 }
@@ -157,7 +169,7 @@ impl Default for StandardBoard {
     }
 }
 
-impl std::ops::Index<<Self as Board>::Index> for StandardBoard {
+impl std::ops::Index<StandardIndex> for StandardBoard {
     type Output = Option<<Self as Board>::Piece>;
 
     fn index(&self, index: <Self as Board>::Index) -> &Self::Output {

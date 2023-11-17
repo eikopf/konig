@@ -1,6 +1,5 @@
 //! An abstract `Index` trait.
 
-use super::board::StaticBoard;
 use thiserror::Error;
 
 /// The result of the incorrect creation or usage of
@@ -17,4 +16,4 @@ pub enum IndexError<T> {
 
 // TODO: are these trait bounds necessary?
 /// Represents a particular place on the associated [`Board`]
-pub trait Index: Sized + Into<usize> + TryFrom<usize> {}
+pub trait Index: Into<usize> + TryFrom<usize> {}

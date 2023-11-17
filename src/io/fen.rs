@@ -1,4 +1,4 @@
-use crate::core::board::StaticBoard;
+use crate::core::board::Board;
 use crate::standard::board::StandardCastlingPermissions;
 use crate::standard::index::StandardIndex;
 use crate::standard::piece::StandardPiece;
@@ -6,10 +6,7 @@ use crate::standard::piece::StandardPiece;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{digit1, one_of, u16, u8};
-use nom::combinator::opt;
-use nom::error::{Error, ErrorKind, ParseError};
 use nom::multi::{many_m_n, separated_list1};
-use nom::sequence::pair;
 use nom::sequence::Tuple;
 use nom::{Finish, IResult};
 use thiserror::Error;
@@ -54,7 +51,7 @@ type PieceArray = [Option<StandardPiece>; 64];
 
 /// Represents the data derived
 /// from parsing a valid FEN string.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct FenData {
     pieces: PieceArray,
     white_to_move: bool,
@@ -66,7 +63,9 @@ pub struct FenData {
 
 impl Default for FenData {
     fn default() -> Self {
-        todo!()
+        parse_fen_string("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+            .unwrap()
+            .1
     }
 }
 
@@ -82,19 +81,19 @@ impl<'a> TryFrom<&'a str> for FenData {
 }
 
 impl FenData {
-    /// Returns a relevant subset of [`FenData`] as a [`StaticBoard`].
-    pub fn as_static_board(self) -> impl StaticBoard<Index = StandardIndex, Piece = StandardPiece> {
+    /// Returns a relevant subset of [`FenData`] as a [`FenBoard`].
+    pub fn as_board(self) -> FenBoard {
         FenBoard::from(self)
     }
 }
 
-/// Wraps a [`FenData`] to provide an `impl [StaticBoard]`.
+/// Wraps a [`FenData`] to provide a [`Board`].
 #[derive(Debug, PartialEq, Eq)]
-struct FenBoard {
+pub struct FenBoard {
     data: FenData,
 }
 
-impl StaticBoard for FenBoard {
+impl Board for FenBoard {
     type Index = StandardIndex;
     type Piece = StandardPiece;
 }
@@ -113,6 +112,16 @@ impl From<FenData> for FenBoard {
     }
 }
 
+impl<'a> IntoIterator for &'a FenBoard {
+    type Item = &'a Option<StandardPiece>;
+
+    type IntoIter = std::slice::Iter<'a, Option<StandardPiece>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.data.pieces.iter()
+    }
+}
+
 impl std::ops::Index<StandardIndex> for FenBoard {
     type Output = Option<StandardPiece>;
 
@@ -122,13 +131,18 @@ impl std::ops::Index<StandardIndex> for FenBoard {
     }
 }
 
+/// Entrypoint to FEN string parsing.
+///
+/// This function is made available in the public API via
+/// [`FenData`]'s [`TryFrom`] implementation.
 fn parse_fen_string(source: &str) -> IResult<&str, FenData> {
     // piece placement grammar
-    let digit17 = one_of::<&str, &str, nom::error::Error<_>>("1234567");
-    let white_piece = one_of("PNBRQK");
-    let black_piece = one_of("pnbrqk");
-    let piece = alt((white_piece, black_piece));
-    let rank_component = pair(opt(digit17), piece);
+    // let digit17 = one_of::<&str, &str, nom::error::Error<_>>("1234567");
+    // let white_piece = one_of("PNBRQK");
+    // let black_piece = one_of("pnbrqk");
+    // let piece = alt((white_piece, black_piece));
+    // let rank_component = pair(opt(digit17), piece);
+    // TODO: implement this with more accurate parsing
     let rank = many_m_n(1, 8, one_of("12345678pnbrqkPNBRQK"));
     let piece_placement = separated_list1(tag("/"), rank);
 
@@ -324,19 +338,24 @@ mod tests {
     use super::*;
 
     #[test]
-    fn check_fen_parser_and_fail() {
+    fn check_fen_parser_on_initial_position() {
         let start = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
         let (_, data) = parse_fen_string(start).unwrap();
         let default = StandardBoard::default();
 
         // for each position on the board, check that the pieces match
-        for i in 0..=63 {
-            let index = StandardIndex::try_from(i).unwrap();
-            println!("{:?}", data.pieces[i]);
-            println!("{:?}", default[index]);
-            // assert_eq!(data.as_static_board()[index], default[index])
-        }
+        default
+            .into_iter()
+            .zip(data.clone().as_board().into_iter())
+            .for_each(|(a, b)| assert_eq!(a, *b));
 
-        assert!(false);
+        assert_eq!(data.white_to_move, true);
+        assert_eq!(
+            data.castling_permissions,
+            StandardCastlingPermissions::default()
+        );
+        assert_eq!(data.en_passant_square, None);
+        assert_eq!(data.halfmove_clock, 0);
+        assert_eq!(data.fullmove_counter, 1);
     }
 }
