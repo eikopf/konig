@@ -96,6 +96,10 @@ pub struct FenBoard {
 impl Board for FenBoard {
     type Index = StandardIndex;
     type Piece = StandardPiece;
+
+    fn get_piece_at(&self, index: Self::Index) -> Option<&Self::Piece> {
+        self.data.pieces[usize::from(index)].as_ref()
+    }
 }
 
 impl Default for FenBoard {

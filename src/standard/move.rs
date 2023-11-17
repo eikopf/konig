@@ -40,8 +40,11 @@ impl Move for StandardMove {
     type Board = StandardBoard;
 }
 
-impl LegalMove for LegalStandardMove {
+impl Move for LegalStandardMove {
     type Board = StandardBoard;
+}
+
+impl LegalMove for LegalStandardMove {
     type Move = StandardMove;
 }
 

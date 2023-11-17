@@ -15,6 +15,8 @@ pub trait Board: std::fmt::Debug {
     type Index: Index;
     /// Represents the pieces which may be on the board.
     type Piece: Piece;
+
+    fn get_piece_at(&self, index: Self::Index) -> Option<&Self::Piece>;
 }
 
 /// Represents a board which can validate candidate moves.

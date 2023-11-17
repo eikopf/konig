@@ -7,7 +7,13 @@ use std::ops::Deref;
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub struct StandardIndex(u8);
 
-impl Index for StandardIndex {}
+impl Index for StandardIndex {
+    type MetricTarget = u8;
+
+    fn distance(a: Self, b: Self) -> Self::MetricTarget {
+        todo!()
+    }
+}
 
 impl Deref for StandardIndex {
     type Target = u8;
@@ -43,9 +49,9 @@ impl TryFrom<usize> for StandardIndex {
     }
 }
 
-impl Into<usize> for StandardIndex {
-    fn into(self) -> usize {
-        self.0 as usize
+impl From<StandardIndex> for usize {
+    fn from(value: StandardIndex) -> Self {
+        value.0 as usize
     }
 }
 

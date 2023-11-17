@@ -77,6 +77,10 @@ pub struct StandardBoard {
 impl Board for StandardBoard {
     type Index = StandardIndex;
     type Piece = StandardPiece;
+
+    fn get_piece_at(&self, index: Self::Index) -> Option<&Self::Piece> {
+        self.pieces[usize::from(index)].as_ref()
+    }
 }
 
 impl Validate for StandardBoard {
