@@ -49,15 +49,19 @@ pub enum FenParseError {
     #[error("parsed too many fields: a valid FEN string has 6")]
     TooManyFields,
 
+    /// Occurs if the FEN string has more than 8 ranks.
     #[error("the piece placement field had too many ranks: a valid FEN string has 8")]
     TooManyRanks,
 
+    /// Occurs if the FEN string has less than 8 ranks.
     #[error("the piece placement field had too few ranks: a valid FEN string has 8")]
     TooFewRanks,
 
+    /// Occurs if the FEN string doesn't end with (optional) whitespace.
     #[error("the given FEN string did not terminate with whitespace")]
     TrailingGarbage,
 
+    /// Occurs if a particular error kind cannot be ascertained.
     #[error("an unknown error occurred while parsing a FEN string")]
     UnknownError,
 }
