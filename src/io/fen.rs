@@ -1,4 +1,6 @@
 use crate::core::board::Board;
+use crate::core::index::Index;
+use crate::core::piece::Piece;
 use crate::standard::board::StandardCastlingPermissions;
 use crate::standard::index::StandardIndex;
 use crate::standard::piece::StandardPiece;
@@ -82,15 +84,15 @@ impl<'a> TryFrom<&'a str> for FenData {
 }
 
 impl FenData {
-    /// Returns a relevant subset of [`FenData`] as a [`FenBoard`].
-    pub fn as_board(self) -> FenBoard {
+    /// Returns the board described by this [`FenData`].
+    pub fn as_board(self) -> impl Board<Piece = StandardPiece, Index = StandardIndex> {
         FenBoard::from(self)
     }
 }
 
 /// Wraps a [`FenData`] to provide a [`Board`].
 #[derive(Debug, PartialEq, Eq)]
-pub struct FenBoard {
+struct FenBoard {
     data: FenData,
 }
 
@@ -359,11 +361,13 @@ mod tests {
         let (_, data) = parse_fen_string(start).unwrap();
         let default = StandardBoard::default();
 
-        // for each position on the board, check that the pieces match
-        default
-            .into_iter()
-            .zip(data.clone().as_board().into_iter())
-            .for_each(|(a, b)| assert_eq!(a, *b));
+        for i in 0..=63 {
+            let index = StandardIndex::try_from(i as u8).unwrap();
+            assert_eq!(
+                default.get_piece_at(index),
+                data.as_board().get_piece_at(index)
+            );
+        }
 
         assert_eq!(data.white_to_move, true);
         assert_eq!(
@@ -385,10 +389,13 @@ mod tests {
         let default = StandardBoard::default();
 
         // for each position on the board, check that the pieces match
-        default
-            .into_iter()
-            .zip(data.clone().as_board().into_iter())
-            .for_each(|(a, b)| assert_eq!(a, *b));
+        for i in 0..=63 {
+            let index = StandardIndex::try_from(i as u8).unwrap();
+            assert_eq!(
+                default.get_piece_at(index),
+                data.as_board().get_piece_at(index)
+            );
+        }
 
         assert_eq!(data.white_to_move, true);
         assert_eq!(
