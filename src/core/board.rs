@@ -13,9 +13,12 @@ use super::r#move::{IllegalMoveError, LegalMove, Move};
 pub trait Board: std::fmt::Debug {
     /// Represents a specific place on the board.
     type Index: Index;
+
     /// Represents the pieces which may be on the board.
     type Piece: Piece;
 
+    /// Returns the piece at the given index by reference
+    /// if it exists, otherwise returns none.
     fn get_piece_at(&self, index: Self::Index) -> Option<&Self::Piece>;
 }
 
