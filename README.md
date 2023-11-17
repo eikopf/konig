@@ -1,5 +1,6 @@
 # Konig
 > Oder `koenig`? Weiß ich nicht.
+
 A Rust-based chess engine, built to support custom implementations and chess variants. In general, it should be just as easy to implement standard chess, hex chess, or an infinite chess board with the traits and definitions in this crate.
 
 ## Top-level `TODO`s for `v0.1.0`
