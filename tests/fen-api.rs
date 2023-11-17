@@ -1,5 +1,5 @@
 use konig::core::board::Board;
-use konig::io::fen::*;
+use konig::io::fen::FenData;
 use konig::standard::index::StandardIndex;
 use konig::standard::piece::StandardPiece;
 

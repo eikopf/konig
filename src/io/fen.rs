@@ -7,7 +7,7 @@ use crate::standard::piece::{StandardColor, StandardPiece, StandardPieceKind};
 
 use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::character::complete::{one_of, u16, u8};
+use nom::character::complete::{one_of, space0, space1, u16, u8};
 use nom::combinator::opt;
 use nom::multi::{many_m_n, separated_list1};
 use nom::sequence::{pair, Tuple};
@@ -48,12 +48,48 @@ pub enum FenParseError {
     /// Occurs if the FEN string has more than six fields.
     #[error("parsed too many fields: a valid FEN string has 6")]
     TooManyFields,
+
+    #[error("the piece placement field had too many ranks: a valid FEN string has 8")]
+    TooManyRanks,
+
+    #[error("the piece placement field had too few ranks: a valid FEN string has 8")]
+    TooFewRanks,
+
+    #[error("the given FEN string did not terminate with whitespace")]
+    TrailingGarbage,
+
+    #[error("an unknown error occurred while parsing a FEN string")]
+    UnknownError,
+}
+
+impl nom::error::ParseError<&str> for FenParseError {
+    fn from_error_kind(input: &str, kind: nom::error::ErrorKind) -> Self {
+        todo!()
+    }
+
+    fn append(input: &str, kind: nom::error::ErrorKind, other: Self) -> Self {
+        todo!()
+    }
 }
 
 type PieceArray = [Option<FenPiece>; 64];
 
 /// Represents the data derived
 /// from parsing a valid FEN string.
+///
+/// Parsing is provided via the `TryFrom<&'a str>`
+/// impl, and the default FEN position is given
+/// by the [`Default`] impl, i.e:
+///
+/// ```
+/// use konig::io::fen::FenData;
+///
+/// let from_string = FenData
+///                     ::try_from("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+///                     .unwrap();
+/// let from_default = FenData::default();
+/// assert_eq!(from_string, from_default); // <= succeeds
+/// ```
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct FenData {
     pieces: PieceArray,
@@ -66,19 +102,21 @@ pub struct FenData {
 
 impl Default for FenData {
     fn default() -> Self {
-        parse_fen_string("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
-            .unwrap()
-            .1
+        let (_, res) =
+            parse_fen_string("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1").unwrap();
+
+        res.unwrap() // safe unwrap
     }
 }
 
 impl<'a> TryFrom<&'a str> for FenData {
-    type Error = nom::error::Error<&'a str>;
+    type Error = FenParseError;
 
     fn try_from(value: &'a str) -> Result<Self, Self::Error> {
         match parse_fen_string(value).finish() {
-            Ok((_, data)) => Ok(data),
-            Err(err) => Err(err),
+            Ok((_, Ok(data))) => Ok(data),
+            Ok((_, Err(err))) => Err(err),
+            Err(_) => Err(FenParseError::UnknownError),
         }
     }
 }
@@ -216,14 +254,13 @@ impl From<FenPieceKind> for StandardPieceKind {
 ///
 /// This function is made available in the public API via
 /// [`FenData`]'s [`TryFrom`] implementation.
-fn parse_fen_string(source: &str) -> IResult<&str, FenData> {
+fn parse_fen_string(source: &str) -> IResult<&str, Result<FenData, FenParseError>> {
     // piece placement grammar
     // let digit17 = one_of::<&str, &str, nom::error::Error<_>>("1234567");
     // let white_piece = one_of("PNBRQK");
     // let black_piece = one_of("pnbrqk");
     // let piece = alt((white_piece, black_piece));
     // let rank_component = pair(opt(digit17), piece);
-    // TODO: implement this with more accurate parsing
     let rank = many_m_n(1, 8, one_of("12345678pnbrqkPNBRQK"));
     let piece_placement = separated_list1(tag("/"), rank);
 
@@ -265,30 +302,59 @@ fn parse_fen_string(source: &str) -> IResult<&str, FenData> {
     // finally parse
     let mut fen_parser = (
         piece_placement,
-        tag(" "),
+        space1,
         side_to_move,
-        tag(" "),
+        space1,
         castling_ability,
-        tag(" "),
+        space1,
         en_passant_target_square,
-        tag(" "),
+        space1,
         halfmove_clock,
-        tag(" "),
+        space1,
         fullmove_counter,
+        space0,
     );
 
-    let (tail, (pieces, _, side, _, castle, _, ep, _, half, _, full)) = fen_parser.parse(source)?;
+    let (tail, (pieces, _, side, _, castle, _, ep, _, half, _, full, _)) =
+        fen_parser.parse(source)?;
+
+    // error handling
+    if tail.len() > 0 {
+        return Ok((tail, Err(FenParseError::TrailingGarbage)));
+    }
+
+    if pieces.len() > 8 {
+        return Ok((tail, Err(FenParseError::TooManyRanks)));
+    } else if pieces.len() < 8 {
+        return Ok((tail, Err(FenParseError::TooFewRanks)));
+    }
+
+    if ep.0 == '-' && ep.1 != None {
+        return Ok((
+            tail,
+            Err(FenParseError::InvalidEnPassantTargetSquareComponent),
+        ));
+    } else if ep.0 != '-' && ep.1 == None {
+        return Ok((
+            tail,
+            Err(FenParseError::InvalidEnPassantTargetSquareComponent),
+        ));
+    }
+
+    if half > 100 {
+        return Ok((tail, Err(FenParseError::InvalidHalfmoveClockComponent)));
+    }
 
     return Ok((
         tail,
-        FenData {
+        Ok(FenData {
             pieces: expand_piece_placement(pieces),
             white_to_move: side == 'w',
             castling_permissions: expand_castling_permissions(castle),
             en_passant_square: expand_en_passant_target_square(ep),
             halfmove_clock: half,
             fullmove_counter: full,
-        },
+        }),
     ));
 }
 
@@ -425,14 +491,13 @@ fn expand_en_passant_target_square(source: (char, Option<char>)) -> Option<Stand
 
 #[cfg(test)]
 mod tests {
-    use crate::standard::board::StandardBoard;
-
     use super::*;
+    use crate::standard::board::StandardBoard;
 
     #[test]
     fn check_fen_parser_on_initial_position() {
         let start = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-        let (_, data) = parse_fen_string(start).unwrap();
+        let data = parse_fen_string(start).unwrap().1.unwrap();
         let default = StandardBoard::default();
 
         for i in 0..=63 {
@@ -461,7 +526,7 @@ mod tests {
 
         // INITIAL STATE
         let start = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-        let (_, data) = parse_fen_string(start).unwrap();
+        let data = parse_fen_string(start).unwrap().1.unwrap();
         let default = StandardBoard::default();
 
         // for each position on the board, check that the pieces match
@@ -486,7 +551,7 @@ mod tests {
 
         // GAME AFTER 1. e4
         let move1 = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1";
-        let (_, data) = parse_fen_string(move1).unwrap();
+        let data = parse_fen_string(move1).unwrap().1.unwrap();
 
         assert_eq!(
             data.as_board()
@@ -507,7 +572,7 @@ mod tests {
 
         // GAME AFTER 1. e4 c5
         let move2 = "rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq c6 0 2";
-        let (_, data) = parse_fen_string(move2).unwrap();
+        let data = parse_fen_string(move2).unwrap().1.unwrap();
         assert_eq!(
             data.as_board()
                 .get_piece_at(StandardIndex::try_from(28u8).unwrap().into()),
@@ -539,7 +604,7 @@ mod tests {
 
         // GAME AFTER 1. e4 c5 2. Nf3
         let move3 = "rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2";
-        let (_, data) = parse_fen_string(move3).unwrap();
+        let data = parse_fen_string(move3).unwrap().1.unwrap();
         assert_eq!(
             data.as_board()
                 .get_piece_at(StandardIndex::try_from(28u8).unwrap().into()),
