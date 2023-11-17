@@ -13,3 +13,9 @@ mod pgn;
 
 /// Provides utilities for Standard Algebraic Notation (SAN).
 mod san;
+
+// NOTE: this is a list of standards to look at implementing after the core four
+// - FEEN: https://github.com/sashite/specs/blob/main/forsyth-edwards-expanded-notation.md
+// - X-FEN: https://en.wikipedia.org/wiki/X-FEN
+// - Shredder-FEN: https://www.chessprogramming.org/Forsyth-Edwards_Notation#Shredder-FEN
+//      - This probably requires an implementation of Chess960

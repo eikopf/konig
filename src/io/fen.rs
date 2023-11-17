@@ -6,9 +6,10 @@ use crate::standard::piece::StandardPiece;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{digit1, one_of, u16, u8};
+use nom::combinator::{map_parser, opt};
 use nom::multi::{many_m_n, separated_list1};
-use nom::sequence::Tuple;
-use nom::{Finish, IResult};
+use nom::sequence::{pair, Tuple};
+use nom::{Finish, IResult, Parser};
 use thiserror::Error;
 
 /// Represents the ways in which a FEN string may be invalid.
@@ -175,10 +176,9 @@ fn parse_fen_string(source: &str) -> IResult<&str, FenData> {
     ));
 
     // en passant target square grammar
-    // let ep_rank = one_of("36");
-    // let file = one_of("abcdefgh");
+    let ep_rank = one_of("36");
     // let ep_square = pair(file, ep_rank);
-    let en_passant_target_square = alt((tag("-"), digit1));
+    let en_passant_target_square = pair(one_of("-abcdefgh"), opt(ep_rank));
 
     // halfmove clock grammar
     let halfmove_clock = u8;
@@ -209,7 +209,7 @@ fn parse_fen_string(source: &str) -> IResult<&str, FenData> {
             pieces: expand_piece_placement(pieces),
             white_to_move: side == 'w',
             castling_permissions: expand_castling_permissions(castle),
-            en_passant_square: None, // TODO: implement algebraic notation in std::index
+            en_passant_square: expand_en_passant_target_square(ep),
             halfmove_clock: half,
             fullmove_counter: full,
         },
@@ -335,6 +335,18 @@ fn expand_castling_permissions(source: &str) -> StandardCastlingPermissions {
     }
 }
 
+/// Converts a parsed en passant target square component into an [`Option<StandardIndex>`].
+///
+/// This function assumes its input is valid, and will panic otherwise.
+fn expand_en_passant_target_square(source: (char, Option<char>)) -> Option<StandardIndex> {
+    match source {
+        ('-', None) => None,
+        (rank, Some('3')) => Some(StandardIndex::try_from(16 + (rank as u8) - 97).unwrap()),
+        (rank, Some('6')) => Some(StandardIndex::try_from(40 + (rank as u8) - 97).unwrap()),
+        _ => unreachable!(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::standard::board::StandardBoard;
@@ -361,5 +373,117 @@ mod tests {
         assert_eq!(data.en_passant_square, None);
         assert_eq!(data.halfmove_clock, 0);
         assert_eq!(data.fullmove_counter, 1);
+    }
+
+    #[test]
+    fn check_fen_parser_on_several_moves() {
+        // This test is based on the example game from https://www.chessprogramming.org/Forsyth-Edwards_Notation
+
+        // INITIAL STATE
+        let start = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+        let (_, data) = parse_fen_string(start).unwrap();
+        let default = StandardBoard::default();
+
+        // for each position on the board, check that the pieces match
+        default
+            .into_iter()
+            .zip(data.clone().as_board().into_iter())
+            .for_each(|(a, b)| assert_eq!(a, *b));
+
+        assert_eq!(data.white_to_move, true);
+        assert_eq!(
+            data.castling_permissions,
+            StandardCastlingPermissions::default()
+        );
+        assert_eq!(data.en_passant_square, None);
+        assert_eq!(data.halfmove_clock, 0);
+        assert_eq!(data.fullmove_counter, 1);
+
+        // GAME AFTER 1. e4
+        let move1 = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1";
+        let (_, data) = parse_fen_string(move1).unwrap();
+
+        assert_eq!(
+            data.as_board()
+                .get_piece_at(StandardIndex::try_from(28u8).unwrap()),
+            Some(&StandardPiece::WhitePawn)
+        );
+        assert_eq!(data.white_to_move, false);
+        assert_eq!(
+            data.castling_permissions,
+            StandardCastlingPermissions::default()
+        );
+        assert_eq!(
+            data.en_passant_square,
+            Some(StandardIndex::try_from(20u8).unwrap())
+        );
+        assert_eq!(data.halfmove_clock, 0);
+        assert_eq!(data.fullmove_counter, 1);
+
+        // GAME AFTER 1. e4 c5
+        let move2 = "rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq c6 0 2";
+        let (_, data) = parse_fen_string(move2).unwrap();
+        assert_eq!(
+            data.as_board()
+                .get_piece_at(StandardIndex::try_from(28u8).unwrap()),
+            Some(&StandardPiece::WhitePawn)
+        );
+        assert_eq!(
+            data.as_board()
+                .get_piece_at(StandardIndex::try_from(34u8).unwrap()),
+            Some(&StandardPiece::BlackPawn)
+        );
+        assert_eq!(
+            // check black pawn has properly moved
+            data.as_board()
+                .get_piece_at(StandardIndex::try_from(50u8).unwrap()),
+            None
+        );
+
+        assert_eq!(data.white_to_move, true);
+        assert_eq!(
+            data.castling_permissions,
+            StandardCastlingPermissions::default()
+        );
+        assert_eq!(
+            data.en_passant_square,
+            Some(StandardIndex::try_from(42u8).unwrap())
+        );
+        assert_eq!(data.halfmove_clock, 0);
+        assert_eq!(data.fullmove_counter, 2);
+
+        // GAME AFTER 1. e4 c5 2. Nf3
+        let move3 = "rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2";
+        let (_, data) = parse_fen_string(move3).unwrap();
+        assert_eq!(
+            data.as_board()
+                .get_piece_at(StandardIndex::try_from(28u8).unwrap()),
+            Some(&StandardPiece::WhitePawn)
+        );
+        assert_eq!(
+            data.as_board()
+                .get_piece_at(StandardIndex::try_from(34u8).unwrap()),
+            Some(&StandardPiece::BlackPawn)
+        );
+        assert_eq!(
+            // check black pawn has properly moved
+            data.as_board()
+                .get_piece_at(StandardIndex::try_from(50u8).unwrap()),
+            None
+        );
+        assert_eq!(
+            data.as_board()
+                .get_piece_at(StandardIndex::try_from(21u8).unwrap()),
+            Some(&StandardPiece::WhiteKnight)
+        );
+
+        assert_eq!(data.white_to_move, false);
+        assert_eq!(
+            data.castling_permissions,
+            StandardCastlingPermissions::default()
+        );
+        assert_eq!(data.en_passant_square, None);
+        assert_eq!(data.halfmove_clock, 1);
+        assert_eq!(data.fullmove_counter, 2);
     }
 }
