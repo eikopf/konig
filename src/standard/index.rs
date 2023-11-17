@@ -71,6 +71,21 @@ impl<'a> Into<&'a str> for StandardIndex {
     }
 }
 
+impl StandardIndex {
+    /// Attempts to construct a valid [`StandardIndex`]
+    /// using the given value, and panics if that fails.
+    ///
+    /// Consider using `try_from(value: usize)` instead for
+    /// safer code.
+    ///
+    /// This should be treated as a utility function,
+    /// to avoid constantly writing `StandardIndex::try_from(val).unwrap()`.
+    pub fn new(value: usize) -> Self {
+        assert!(value <= 63);
+        Self(value as u8)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
