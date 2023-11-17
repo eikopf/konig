@@ -6,8 +6,8 @@ A Rust-based chess engine, built to support custom implementations and chess var
 ## Top-level `TODO`s for `v0.1.0`
 - [ ] `konig::core`
   - The essential traits and definitions for `konig`.
-  - [ ] Finalise trait definitions.
-  - [ ] Investigate: should the given traits be object-safe?
+  - [x] Finalise trait definitions.
+  - [x] Investigate: should the given traits be object-safe?
     - This would require removing `std::ops::Index` from the supertraits of `core::board::Board`, for example.
   - [ ] Complete and review documentation.
 - [ ] `konig::standard`
