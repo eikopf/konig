@@ -16,4 +16,4 @@ pub enum IndexError<T> {
 
 // TODO: are these trait bounds necessary?
 /// Represents a particular place on the associated [`Board`]
-pub trait Index: Sized + Into<usize> + TryFrom<usize> {}
+pub trait Index: Into<usize> + TryFrom<usize> {}

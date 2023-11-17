@@ -66,7 +66,9 @@ pub struct FenData {
 
 impl Default for FenData {
     fn default() -> Self {
-        todo!()
+        parse_fen_string("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+            .unwrap()
+            .1
     }
 }
 
@@ -88,7 +90,7 @@ impl FenData {
     }
 }
 
-/// Wraps a [`FenData`] to provide an `impl [StaticBoard]`.
+/// Wraps a [`FenData`] to provide a [`Board`].
 #[derive(Debug, PartialEq, Eq)]
 pub struct FenBoard {
     data: FenData,
@@ -132,6 +134,10 @@ impl std::ops::Index<StandardIndex> for FenBoard {
     }
 }
 
+/// Entrypoint to FEN string parsing.
+///
+/// This function is made available in the public API via
+/// [`FenData`]'s [`TryFrom`] implementation.
 fn parse_fen_string(source: &str) -> IResult<&str, FenData> {
     // piece placement grammar
     let digit17 = one_of::<&str, &str, nom::error::Error<_>>("1234567");
@@ -334,7 +340,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn check_fen_parser_and_fail() {
+    fn check_fen_parser_on_initial_position() {
         let start = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
         let (_, data) = parse_fen_string(start).unwrap();
         let default = StandardBoard::default();
