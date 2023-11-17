@@ -29,7 +29,87 @@ pub enum StandardPiece {
     WhiteKing,
 }
 
-impl Piece for StandardPiece {}
+/// Represents the standard set of chess piece colors.
+#[derive(Debug, Eq, PartialEq)]
+pub enum StandardColor {
+    /// The second-playing side.
+    Black,
+    /// The first-playing side.
+    White,
+}
+
+/// Represents the standard set of chess piece kinds.
+#[derive(Debug, Eq, PartialEq)]
+pub enum StandardPieceKind {
+    /// A pawn.
+    Pawn,
+    /// A rook.
+    Rook,
+    /// A knight.
+    Knight,
+    /// A bishop.
+    Bishop,
+    /// A queen.
+    Queen,
+    /// A king.
+    King,
+}
+
+impl Piece for StandardPiece {
+    type Color = StandardColor;
+    type Kind = StandardPieceKind;
+
+    fn color(&self) -> Self::Color {
+        match self {
+            Self::BlackPawn => StandardColor::Black,
+            Self::BlackRook => StandardColor::Black,
+            Self::BlackKnight => StandardColor::Black,
+            Self::BlackBishop => StandardColor::Black,
+            Self::BlackQueen => StandardColor::Black,
+            Self::BlackKing => StandardColor::Black,
+            Self::WhitePawn => StandardColor::White,
+            Self::WhiteRook => StandardColor::White,
+            Self::WhiteKnight => StandardColor::White,
+            Self::WhiteBishop => StandardColor::White,
+            Self::WhiteQueen => StandardColor::White,
+            Self::WhiteKing => StandardColor::White,
+        }
+    }
+
+    fn kind(&self) -> Self::Kind {
+        match self {
+            Self::BlackPawn => StandardPieceKind::Pawn,
+            Self::BlackRook => StandardPieceKind::Rook,
+            Self::BlackKnight => StandardPieceKind::Knight,
+            Self::BlackBishop => StandardPieceKind::Bishop,
+            Self::BlackQueen => StandardPieceKind::Queen,
+            Self::BlackKing => StandardPieceKind::King,
+            Self::WhitePawn => StandardPieceKind::Pawn,
+            Self::WhiteRook => StandardPieceKind::Rook,
+            Self::WhiteKnight => StandardPieceKind::Knight,
+            Self::WhiteBishop => StandardPieceKind::Bishop,
+            Self::WhiteQueen => StandardPieceKind::Queen,
+            Self::WhiteKing => StandardPieceKind::King,
+        }
+    }
+
+    fn new(color: Self::Color, kind: Self::Kind) -> Self {
+        match (color, kind) {
+            (StandardColor::Black, StandardPieceKind::Pawn) => Self::BlackPawn,
+            (StandardColor::Black, StandardPieceKind::Rook) => Self::BlackRook,
+            (StandardColor::Black, StandardPieceKind::Knight) => Self::BlackKnight,
+            (StandardColor::Black, StandardPieceKind::Bishop) => Self::BlackBishop,
+            (StandardColor::Black, StandardPieceKind::Queen) => Self::BlackQueen,
+            (StandardColor::Black, StandardPieceKind::King) => Self::BlackKing,
+            (StandardColor::White, StandardPieceKind::Pawn) => Self::WhitePawn,
+            (StandardColor::White, StandardPieceKind::Rook) => Self::WhiteRook,
+            (StandardColor::White, StandardPieceKind::Knight) => Self::WhiteKnight,
+            (StandardColor::White, StandardPieceKind::Bishop) => Self::WhiteBishop,
+            (StandardColor::White, StandardPieceKind::Queen) => Self::WhiteQueen,
+            (StandardColor::White, StandardPieceKind::King) => Self::WhiteKing,
+        }
+    }
+}
 
 impl TryFrom<char> for StandardPiece {
     type Error = (); // there's basically only one reason for this conversion to fail

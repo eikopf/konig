@@ -1,20 +1,15 @@
 use crate::core::index::{Index, IndexError};
-use crate::standard::board::StandardBoard;
-use std::ops::Deref;
+use nonmax::NonMaxU8;
 
 /// Represents a specific square on a `StandardBoard`
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
-pub struct StandardIndex(u8);
+pub struct StandardIndex(NonMaxU8);
 
 impl Index for StandardIndex {
-    type Board = StandardBoard;
-}
+    type MetricTarget = u8;
 
-impl Deref for StandardIndex {
-    type Target = u8;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
+    fn distance(a: Self, b: Self) -> Self::MetricTarget {
+        todo!()
     }
 }
 
@@ -23,7 +18,7 @@ impl TryFrom<u8> for StandardIndex {
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
-            index @ 0..=63 => Ok(Self(index)),
+            index @ 0..=63 => Ok(Self(index.try_into().unwrap())),
             index @ _ => Err(IndexError::OutOfBounds(index)),
         }
     }
@@ -44,9 +39,9 @@ impl TryFrom<usize> for StandardIndex {
     }
 }
 
-impl Into<usize> for StandardIndex {
-    fn into(self) -> usize {
-        self.0 as usize
+impl From<StandardIndex> for usize {
+    fn from(value: StandardIndex) -> Self {
+        u8::from(value.0) as usize
     }
 }
 
@@ -63,6 +58,28 @@ impl<'a> Into<&'a str> for StandardIndex {
     fn into(self) -> &'a str {
         // TODO: complete function
         todo!()
+    }
+}
+
+impl StandardIndex {
+    /// Attempts to construct a valid [`StandardIndex`]
+    /// using the given value, and panics if that fails.
+    ///
+    /// Consider using `try_from(value: usize)` instead for
+    /// safer code.
+    ///
+    /// This should be treated as a utility function,
+    /// to avoid constantly writing `StandardIndex::try_from(val).unwrap()`.
+    pub fn new(value: u8) -> Self {
+        assert!(value <= 63);
+        unsafe { Self(NonMaxU8::new_unchecked(value)) }
+    }
+
+    /// Constructs a [`StandardIndex`] without performing
+    /// safety checks. The caller must ensure that the
+    /// value is less than 64.
+    pub(crate) unsafe fn new_unchecked(value: u8) -> Self {
+        Self(NonMaxU8::new_unchecked(value))
     }
 }
 

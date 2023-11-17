@@ -5,7 +5,46 @@ use super::{
     r#move::{IllegalStandardMoveError, LegalStandardMove, StandardMove},
 };
 
-use crate::{core::board::Board, standard::piece::StandardPiece};
+use crate::{
+    core::board::{Board, Process, Validate},
+    standard::piece::StandardPiece,
+};
+
+/// Represents the possible castling permissions described by a FEN string.
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub struct StandardCastlingPermissions {
+    /// Whether or not castling on the bottom-right is allowed.
+    pub white_king_side: bool,
+    /// Whether or not castling on the bottom-left is allowed.
+    pub white_queen_side: bool,
+    /// Whether or not castling on the top-right is allowed.
+    pub black_king_side: bool,
+    /// Whether or not castling on the top-left is allowed.
+    pub black_queen_side: bool,
+}
+
+impl StandardCastlingPermissions {
+    /// Convienience function for the empty set of castling permissions.
+    pub fn none() -> StandardCastlingPermissions {
+        StandardCastlingPermissions {
+            white_king_side: false,
+            white_queen_side: false,
+            black_king_side: false,
+            black_queen_side: false,
+        }
+    }
+}
+
+impl Default for StandardCastlingPermissions {
+    fn default() -> Self {
+        Self {
+            white_king_side: true,
+            white_queen_side: true,
+            black_king_side: true,
+            black_queen_side: true,
+        }
+    }
+}
 
 /// Represents the implicit state of a standard
 /// 8x8 chess board, i.e. the information that
@@ -14,7 +53,7 @@ use crate::{core::board::Board, standard::piece::StandardPiece};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct StandardBoardState {
     white_turn: bool,
-    castling_rights: [bool; 4], // clockwise from the bottom-right on a per-rook basis
+    castling_rights: StandardCastlingPermissions,
     en_passant_square: Option<StandardIndex>,
 }
 
@@ -22,7 +61,7 @@ impl Default for StandardBoardState {
     fn default() -> Self {
         Self {
             white_turn: true,
-            castling_rights: [true, true, true, true],
+            castling_rights: StandardCastlingPermissions::default(),
             en_passant_square: None,
         }
     }
@@ -31,25 +70,31 @@ impl Default for StandardBoardState {
 /// Represents a standard 8x8 chess board.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct StandardBoard {
-    // pieces
     pieces: [Option<StandardPiece>; 64],
-
-    // essential state
     state: StandardBoardState,
 }
 
 impl Board for StandardBoard {
-    type IllegalMoveError = IllegalStandardMoveError;
     type Index = StandardIndex;
-    type LegalMove = LegalStandardMove;
-    type Move = StandardMove;
     type Piece = StandardPiece;
 
-    fn process(&mut self, candidate: Self::LegalMove) -> Self {
+    fn get_piece_at(&self, index: Self::Index) -> Option<&Self::Piece> {
+        self.pieces[usize::from(index)].as_ref()
+    }
+}
+
+impl Validate for StandardBoard {
+    type LegalMove = LegalStandardMove;
+    type Move = StandardMove;
+    type ValidationError = IllegalStandardMoveError;
+
+    fn validate(&self, candidate: Self::Move) -> Result<Self::LegalMove, Self::ValidationError> {
         todo!()
     }
+}
 
-    fn validate(&self, candidate: Self::Move) -> Result<Self::LegalMove, Self::IllegalMoveError> {
+impl Process for StandardBoard {
+    fn process(&self, candidate: Self::LegalMove) -> Self {
         todo!()
     }
 }
@@ -128,7 +173,7 @@ impl Default for StandardBoard {
     }
 }
 
-impl std::ops::Index<<Self as Board>::Index> for StandardBoard {
+impl std::ops::Index<StandardIndex> for StandardBoard {
     type Output = Option<<Self as Board>::Piece>;
 
     fn index(&self, index: <Self as Board>::Index) -> &Self::Output {

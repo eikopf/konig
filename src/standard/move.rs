@@ -1,5 +1,5 @@
 use super::{board::StandardBoard, index::StandardIndex};
-use crate::core::r#move::{IllegalMoveError, LegalMove, Move};
+use crate::core::r#move::{IllegalMoveError, LegalMove, Move, WrapMove};
 use thiserror::Error;
 
 /// Results when a [`StandardMove`] cannot be converted into a [`LegalStandardMove`]
@@ -26,8 +26,10 @@ impl IllegalMoveError for IllegalStandardMoveError {
 /// including illegal moves.
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub struct StandardMove {
-    source: StandardIndex,
-    target: StandardIndex,
+    /// The position to take a [`Piece`] from.
+    pub source: StandardIndex,
+    /// The position to move a [`Piece`] to.
+    pub target: StandardIndex,
 }
 
 /// Represents a legal move on a `StandardBoard`.
@@ -38,9 +40,18 @@ impl Move for StandardMove {
     type Board = StandardBoard;
 }
 
-impl LegalMove for LegalStandardMove {
+impl Move for LegalStandardMove {
     type Board = StandardBoard;
+}
+
+impl LegalMove for LegalStandardMove {
     type Move = StandardMove;
+}
+
+impl WrapMove for LegalStandardMove {
+    fn wrap(value: Self::Move) -> Self {
+        Self(value)
+    }
 }
 
 impl From<(StandardIndex, StandardIndex)> for StandardMove {
