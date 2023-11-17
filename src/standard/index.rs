@@ -1,11 +1,9 @@
 use crate::core::index::{Index, IndexError};
-use std::ops::Deref;
-
-// TODO: make standard index use nonmax::NonMaxU8
+use nonmax::NonMaxU8;
 
 /// Represents a specific square on a `StandardBoard`
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
-pub struct StandardIndex(u8);
+pub struct StandardIndex(NonMaxU8);
 
 impl Index for StandardIndex {
     type MetricTarget = u8;
@@ -15,20 +13,12 @@ impl Index for StandardIndex {
     }
 }
 
-impl Deref for StandardIndex {
-    type Target = u8;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
 impl TryFrom<u8> for StandardIndex {
     type Error = IndexError<u8>;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
-            index @ 0..=63 => Ok(Self(index)),
+            index @ 0..=63 => Ok(Self(index.try_into().unwrap())),
             index @ _ => Err(IndexError::OutOfBounds(index)),
         }
     }
@@ -51,7 +41,7 @@ impl TryFrom<usize> for StandardIndex {
 
 impl From<StandardIndex> for usize {
     fn from(value: StandardIndex) -> Self {
-        value.0 as usize
+        u8::from(value.0) as usize
     }
 }
 
@@ -80,9 +70,16 @@ impl StandardIndex {
     ///
     /// This should be treated as a utility function,
     /// to avoid constantly writing `StandardIndex::try_from(val).unwrap()`.
-    pub fn new(value: usize) -> Self {
+    pub fn new(value: u8) -> Self {
         assert!(value <= 63);
-        Self(value as u8)
+        unsafe { Self(NonMaxU8::new_unchecked(value)) }
+    }
+
+    /// Constructs a [`StandardIndex`] without performing
+    /// safety checks. The caller must ensure that the
+    /// value is less than 64.
+    pub(crate) unsafe fn new_unchecked(value: u8) -> Self {
+        Self(NonMaxU8::new_unchecked(value))
     }
 }
 

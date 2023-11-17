@@ -1,7 +1,7 @@
 [package]
 authors = ["Oliver Wooding <oliverwooding@icloud.com>"]
 name = "konig"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 readme = "README.md"
 repository = "https://github.com/eikopf/konig"
@@ -14,4 +14,5 @@ description = "A chess engine built to support variants and custom implementatio
 
 [dependencies]
 nom = "7.1.3"
+nonmax = "0.5.4"
 thiserror = "1.0.44"
