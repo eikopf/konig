@@ -175,9 +175,9 @@ impl Default for StandardBoard {
 }
 
 impl std::ops::Index<StandardIndex> for StandardBoard {
-    type Output = Option<<Self as Board>::Piece>;
+    type Output = Option<StandardPiece>;
 
-    fn index(&self, index: <Self as Board>::Index) -> &Self::Output {
+    fn index(&self, index: StandardIndex) -> &Self::Output {
         &self.pieces[<StandardIndex as Into<usize>>::into(index)]
     }
 }

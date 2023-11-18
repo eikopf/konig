@@ -3,7 +3,7 @@ use crate::core::index::Index;
 use crate::core::piece::Piece;
 use crate::standard::board::{StandardBoard, StandardCastlingPermissions};
 use crate::standard::index::StandardIndex;
-use crate::standard::piece::{StandardColor, StandardPiece, StandardPieceKind};
+use crate::standard::piece::StandardPiece;
 
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -123,7 +123,8 @@ impl Fen {
     ) -> impl Board<
         Piece = impl Piece + Into<StandardPiece> + From<StandardPiece> + std::fmt::Debug + Eq + Copy,
         Index = impl Index<MetricTarget = u8> + Into<StandardIndex> + From<StandardIndex>,
-    > {
+    > + std::ops::Index<StandardIndex, Output = Option<StandardPiece>>
+           + std::fmt::Debug {
         FenBoard::from(self)
     }
 
@@ -198,6 +199,14 @@ impl Default for FenBoard {
         Self {
             data: Fen::default(),
         }
+    }
+}
+
+impl std::ops::Index<StandardIndex> for FenBoard {
+    type Output = Option<StandardPiece>;
+
+    fn index(&self, index: StandardIndex) -> &Self::Output {
+        &self.data.pieces[usize::from(index)]
     }
 }
 
