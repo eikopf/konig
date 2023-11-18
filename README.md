@@ -4,13 +4,13 @@
 A Rust-based chess engine, built to support custom implementations and chess variants. In general, it should be just as easy to implement standard chess, hex chess, or an infinite chess board with the traits and definitions in this crate.
 
 ## Top-level `TODO`s for `v0.2.0`
-- [ ] `konig::core`
+- [x] `konig::core`
   - The essential traits and definitions for `konig`.
   - [x] Finalise trait definitions.
   - [x] Investigate: should the given traits be object-safe?
     - This would require removing `std::ops::Index` from the supertraits of `core::board::Board`, for example.
-  - [ ] Add tests to ensure object-safety for selected traits.
-  - [ ] Complete and review documentation.
+  - [x] Add tests to ensure object-safety for selected traits.
+  - [x] Complete and review documentation.
 - [ ] `konig::standard`
   - An implementation of standard chess using `konig::core`.
   - [ ] Move validation.
