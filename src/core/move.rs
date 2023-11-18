@@ -1,30 +1,52 @@
-//! An abstract `Move` trait.
+//! Traits for representing moves on chessboards.
 
 use std::error::Error;
 
-use super::board::Validate;
+use super::{board::Validate, index::Index};
 
 /// Represents an error which occurs during the verification
 /// of a candidate move.
 pub trait IllegalMoveError: Error {
     /// The associated board on which moves can act.
-    type Board: Validate;
+    type Board: Validate<
+        Index = Self::Index,
+        Move = Self::Move,
+        LegalMove = Self::LegalMove,
+        ValidationError = Self,
+    >;
+    /// The associated index type (metric space) in which moves act.
+    type Index: Index;
     /// The potentially illegal candidate moves.
-    type Move: Move<Board = Self::Board>;
+    type Move: Move<Index = Self::Index, Board = Self::Board>;
     /// The verified-legal moves.
-    type LegalMove: LegalMove;
+    type LegalMove: LegalMove<Index = Self::Index, Move = Self::Move>;
 }
 
-/// Represents a (potentially illegal) move on the associated [`Board`].
+/// Represents a (potentially illegal) move on the associated [`Validate`].
+///
+/// A [`Move`] is essentially a pair of points in the metric space defined
+/// by its generic [`Index`] type parameter; the convention in `konig` is
+/// to call the first point the `source` and the second point the `target`.
 pub trait Move {
-    /// A [`Board`] on which moves can act.
-    type Board: Validate;
+    /// A [`Validate`] against which moves can be checked.
+    type Board: Validate<Index = Self::Index>;
+    /// An [`Index`] metric space in which moves are considered pairs.
+    type Index: Index;
+
+    /// Returns the source [`Index`] of the move.
+    fn source(&self) -> Self::Index;
+    /// Returns the target [`Index`] of the move.
+    fn target(&self) -> Self::Index;
+    /// Returns the source and target [indices](Index) of the move.
+    fn as_pair(&self) -> (Self::Index, Self::Index) {
+        (self.source(), self.target())
+    }
 }
 
-/// Represents a legal move on the associated [`Board`].
+/// Represents a legal move on the associated [`Validate`].
 pub trait LegalMove: Move {
     /// The associated [`Move`] type from which [`LegalMove`]s are derived.
-    type Move: Move<Board = Self::Board>;
+    type Move: Move<Index = Self::Index, Board = Self::Board>;
 }
 
 /// Crate-internal constructor trait for [`LegalMove`]s.

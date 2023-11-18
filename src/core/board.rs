@@ -25,11 +25,16 @@ pub trait Board: std::fmt::Debug {
 /// Represents a board which can validate candidate moves.
 pub trait Validate: Board {
     /// Represents a move which may or may not be legal.
-    type Move: Move;
+    type Move: Move<Board = Self, Index = Self::Index>;
     /// Represents a move which has been confirmed to be legal.
-    type LegalMove: LegalMove;
+    type LegalMove: LegalMove<Board = Self, Index = Self::Index>;
     /// The error created when move validation fails.
-    type ValidationError: IllegalMoveError;
+    type ValidationError: IllegalMoveError<
+        Board = Self,
+        Index = Self::Index,
+        Move = Self::Move,
+        LegalMove = Self::LegalMove,
+    >;
     /// Validates the given candidate move based on the current state of self.
     fn validate(&self, candidate: Self::Move) -> Result<Self::LegalMove, Self::ValidationError>;
 }

@@ -1,4 +1,4 @@
-//! An abstract `Index` trait.
+//! Traits for representing metric spaces composed of chessboard indices.
 
 use thiserror::Error;
 
@@ -18,8 +18,9 @@ pub enum IndexError<T> {
 ///
 /// Indices on a chessboard form a set of positions equipped
 /// with a notion of distance between them, and so they form
-/// a metric space. The obvious example of this is the Chebyshev
-/// distance, which describes the distance between squares on a
+/// a metric space. The obvious example of this is the [Chebyshev
+/// distance](https://en.wikipedia.org/wiki/Chebyshev_distance),
+/// which describes the distance between squares on a
 /// standard chessboard (from the perspective of the king).
 pub trait Index {
     /// The type of the distance between two indices.
