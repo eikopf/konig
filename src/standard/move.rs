@@ -18,6 +18,7 @@ pub enum IllegalStandardMoveError {
 
 impl IllegalMoveError for IllegalStandardMoveError {
     type Board = StandardBoard;
+    type Index = StandardIndex;
     type Move = StandardMove;
     type LegalMove = LegalStandardMove;
 }
@@ -26,9 +27,9 @@ impl IllegalMoveError for IllegalStandardMoveError {
 /// including illegal moves.
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub struct StandardMove {
-    /// The position to take a [`Piece`] from.
+    /// The position to take a [piece](crate::standard::piece::StandardPiece) from.
     pub source: StandardIndex,
-    /// The position to move a [`Piece`] to.
+    /// The position to move a [piece](crate::standard::piece::StandardPiece) to.
     pub target: StandardIndex,
 }
 
@@ -38,10 +39,28 @@ pub struct LegalStandardMove(StandardMove);
 
 impl Move for StandardMove {
     type Board = StandardBoard;
+    type Index = StandardIndex;
+
+    fn source(&self) -> Self::Index {
+        self.source
+    }
+
+    fn target(&self) -> Self::Index {
+        self.target
+    }
 }
 
 impl Move for LegalStandardMove {
     type Board = StandardBoard;
+    type Index = StandardIndex;
+
+    fn source(&self) -> Self::Index {
+        self.0.source
+    }
+
+    fn target(&self) -> Self::Index {
+        self.0.target
+    }
 }
 
 impl LegalMove for LegalStandardMove {

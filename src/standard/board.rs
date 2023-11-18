@@ -7,6 +7,7 @@ use super::{
 
 use crate::{
     core::board::{Board, Process, Validate},
+    io::fen::Fen,
     standard::piece::StandardPiece,
 };
 
@@ -174,10 +175,35 @@ impl Default for StandardBoard {
 }
 
 impl std::ops::Index<StandardIndex> for StandardBoard {
-    type Output = Option<<Self as Board>::Piece>;
+    type Output = Option<StandardPiece>;
 
-    fn index(&self, index: <Self as Board>::Index) -> &Self::Output {
+    fn index(&self, index: StandardIndex) -> &Self::Output {
         &self.pieces[<StandardIndex as Into<usize>>::into(index)]
+    }
+}
+
+impl From<Fen> for StandardBoard {
+    fn from(value: Fen) -> Self {
+        let mut pieces = [None; 64];
+        let board = value.into_board();
+        for i in 0..=63 {
+            let index = unsafe { StandardIndex::new_unchecked(i) };
+            let piece: Option<StandardPiece> = board.get_piece_at(index.into()).map(|&p| p.into());
+            pieces[i as usize] = piece;
+        }
+
+        let state = StandardBoardState {
+            white_turn: value.white_to_move(),
+            castling_rights: StandardCastlingPermissions {
+                white_king_side: value.castling_permissions().0,
+                white_queen_side: value.castling_permissions().1,
+                black_king_side: value.castling_permissions().2,
+                black_queen_side: value.castling_permissions().3,
+            },
+            en_passant_square: value.en_passant_square().map(Into::into),
+        };
+
+        Self { pieces, state }
     }
 }
 

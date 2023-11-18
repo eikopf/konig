@@ -1,9 +1,9 @@
 use crate::core::board::Board;
 use crate::core::index::Index;
 use crate::core::piece::Piece;
-use crate::standard::board::StandardCastlingPermissions;
+use crate::standard::board::{StandardBoard, StandardCastlingPermissions};
 use crate::standard::index::StandardIndex;
-use crate::standard::piece::{StandardColor, StandardPiece, StandardPieceKind};
+use crate::standard::piece::StandardPiece;
 
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -66,17 +66,7 @@ pub enum FenParseError {
     UnknownError,
 }
 
-impl nom::error::ParseError<&str> for FenParseError {
-    fn from_error_kind(input: &str, kind: nom::error::ErrorKind) -> Self {
-        todo!()
-    }
-
-    fn append(input: &str, kind: nom::error::ErrorKind, other: Self) -> Self {
-        todo!()
-    }
-}
-
-type PieceArray = [Option<FenPiece>; 64];
+type PieceArray = [Option<StandardPiece>; 64];
 
 /// Represents the data derived
 /// from parsing a valid FEN string.
@@ -86,16 +76,16 @@ type PieceArray = [Option<FenPiece>; 64];
 /// by the [`Default`] impl, i.e:
 ///
 /// ```
-/// use konig::io::fen::FenData;
+/// use konig::io::fen::Fen;
 ///
-/// let from_string = FenData
-///                     ::try_from("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
-///                     .unwrap();
-/// let from_default = FenData::default();
+/// let from_string =
+///     Fen::try_from("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+///     .unwrap();
+/// let from_default = Fen::default();
 /// assert_eq!(from_string, from_default); // <= succeeds
 /// ```
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub struct FenData {
+pub struct Fen {
     pieces: PieceArray,
     white_to_move: bool,
     castling_permissions: StandardCastlingPermissions,
@@ -104,7 +94,7 @@ pub struct FenData {
     fullmove_counter: u16,
 }
 
-impl Default for FenData {
+impl Default for Fen {
     fn default() -> Self {
         let (_, res) =
             parse_fen_string("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1").unwrap();
@@ -113,7 +103,7 @@ impl Default for FenData {
     }
 }
 
-impl<'a> TryFrom<&'a str> for FenData {
+impl<'a> TryFrom<&'a str> for Fen {
     type Error = FenParseError;
 
     fn try_from(value: &'a str) -> Result<Self, Self::Error> {
@@ -125,22 +115,79 @@ impl<'a> TryFrom<&'a str> for FenData {
     }
 }
 
-impl FenData {
-    /// Returns the board described by this [`FenData`].
-    pub fn as_board(self) -> impl Board<Piece = FenPiece, Index = FenIndex> {
+impl Fen {
+    /// Consumes `self` and returns the piece placement component of the FEN string
+    /// as a [`Board`].
+    pub fn into_board(
+        self,
+    ) -> impl Board<
+        Piece = impl Piece + Into<StandardPiece> + From<StandardPiece> + std::fmt::Debug + Eq + Copy,
+        Index = impl Index<MetricTarget = u8> + Into<StandardIndex> + From<StandardIndex>,
+    > + std::ops::Index<StandardIndex, Output = Option<StandardPiece>>
+           + std::fmt::Debug {
         FenBoard::from(self)
+    }
+
+    /// Consumes `self` and constructs a [`StandardBoard`] representing
+    /// the same position.
+    ///
+    /// This operation is potentially expensive, and unless you
+    /// specifically need a [`StandardBoard`], you should prefer
+    /// [`Fen`]'s `into_board` method.
+    pub fn to_standard_board(self) -> StandardBoard {
+        self.into()
+    }
+
+    /// Returns `true` if it is white's turn to move, and `false` if it is black's.
+    pub fn white_to_move(&self) -> bool {
+        self.white_to_move
+    }
+
+    // TODO: should this be a unique type?
+    /// Returns the castling permissions as they appear in a FEN string.
+    ///
+    /// # Examples
+    /// - `KQkq` => `(true, true, true, true)`;
+    /// - `Kkq`  => `(true, false, true, true)`;
+    /// - `Qq`   => `(false, true, false, true)`;
+    /// - `-`    => `(false, false, false, false)`;
+    pub fn castling_permissions(&self) -> (bool, bool, bool, bool) {
+        let perms = self.castling_permissions;
+        (
+            perms.white_king_side,
+            perms.white_queen_side,
+            perms.black_king_side,
+            perms.black_queen_side,
+        )
+    }
+
+    /// Returns the index of the en passant target square, if it exists.
+    pub fn en_passant_square(&self) -> Option<impl Index<MetricTarget = u8> + Into<StandardIndex>> {
+        self.en_passant_square
+    }
+
+    /// Returns the value of the halfmove clock as a `u8`, in
+    /// which it is always guaranteed to fit.
+    pub fn halfmove_clock(&self) -> u8 {
+        self.halfmove_clock
+    }
+
+    /// Returns the value of the fullmove counter as a `u16`,
+    /// in which it is always guaranteed to fit.
+    pub fn fullmove_counter(&self) -> u16 {
+        self.fullmove_counter
     }
 }
 
-/// Wraps a [`FenData`] to provide a [`Board`].
+/// Wraps a [`Fen`] to provide a [`Board`].
 #[derive(Debug, PartialEq, Eq)]
 struct FenBoard {
-    data: FenData,
+    data: Fen,
 }
 
 impl Board for FenBoard {
-    type Index = FenIndex;
-    type Piece = FenPiece;
+    type Index = StandardIndex;
+    type Piece = StandardPiece;
 
     fn get_piece_at(&self, index: Self::Index) -> Option<&Self::Piece> {
         self.data.pieces[usize::from(index)].as_ref()
@@ -150,115 +197,30 @@ impl Board for FenBoard {
 impl Default for FenBoard {
     fn default() -> Self {
         Self {
-            data: FenData::default(),
+            data: Fen::default(),
         }
     }
 }
 
-impl From<FenData> for FenBoard {
-    fn from(value: FenData) -> Self {
+impl std::ops::Index<StandardIndex> for FenBoard {
+    type Output = Option<StandardPiece>;
+
+    fn index(&self, index: StandardIndex) -> &Self::Output {
+        &self.data.pieces[usize::from(index)]
+    }
+}
+
+impl From<Fen> for FenBoard {
+    fn from(value: Fen) -> Self {
         Self { data: value }
-    }
-}
-
-/// The index type into the return type of [`FenData`]'s `as_board` method.
-pub struct FenIndex(StandardIndex);
-
-impl From<StandardIndex> for FenIndex {
-    fn from(value: StandardIndex) -> Self {
-        Self(value)
-    }
-}
-
-impl From<FenIndex> for usize {
-    fn from(value: FenIndex) -> Self {
-        value.0.into()
-    }
-}
-
-impl Index for FenIndex {
-    type MetricTarget = u8;
-
-    fn distance(a: Self, b: Self) -> Self::MetricTarget {
-        // TODO: complete this function
-        todo!()
-    }
-}
-
-/// The piece type in the return type of [`FenData`]'s `as_board` method.
-#[derive(Eq, PartialEq, Copy, Clone, Debug)]
-pub struct FenPiece(StandardPiece);
-
-impl From<StandardPiece> for FenPiece {
-    fn from(value: StandardPiece) -> Self {
-        Self(value)
-    }
-}
-
-impl From<FenPiece> for StandardPiece {
-    fn from(value: FenPiece) -> Self {
-        value.0
-    }
-}
-
-impl Piece for FenPiece {
-    type Color = FenColor;
-
-    type Kind = FenPieceKind;
-
-    fn color(&self) -> Self::Color {
-        self.0.color().into()
-    }
-
-    fn kind(&self) -> Self::Kind {
-        self.0.kind().into()
-    }
-
-    fn new(color: Self::Color, kind: Self::Kind) -> Self
-    where
-        Self: Sized,
-    {
-        Self(StandardPiece::new(color.into(), kind.into()))
-    }
-}
-
-/// The color type associated with a [`FenPiece`].
-#[derive(Eq, PartialEq, Debug)]
-pub struct FenColor(StandardColor);
-
-impl From<StandardColor> for FenColor {
-    fn from(value: StandardColor) -> Self {
-        Self(value)
-    }
-}
-
-impl From<FenColor> for StandardColor {
-    fn from(value: FenColor) -> Self {
-        value.0
-    }
-}
-
-/// The kind type associated with a [`FenPiece`].
-#[derive(Eq, PartialEq, Debug)]
-pub struct FenPieceKind(StandardPieceKind);
-
-impl From<StandardPieceKind> for FenPieceKind {
-    fn from(value: StandardPieceKind) -> Self {
-        Self(value)
-    }
-}
-
-impl From<FenPieceKind> for StandardPieceKind {
-    fn from(value: FenPieceKind) -> Self {
-        value.0
     }
 }
 
 /// Entrypoint to FEN string parsing.
 ///
 /// This function is made available in the public API via
-/// [`FenData`]'s [`TryFrom`] implementation.
-fn parse_fen_string(source: &str) -> IResult<&str, Result<FenData, FenParseError>> {
+/// [`Fen`]'s [`TryFrom`] implementation.
+fn parse_fen_string(source: &str) -> IResult<&str, Result<Fen, FenParseError>> {
     // piece placement grammar
     // let digit17 = one_of::<&str, &str, nom::error::Error<_>>("1234567");
     // let white_piece = one_of("PNBRQK");
@@ -351,7 +313,7 @@ fn parse_fen_string(source: &str) -> IResult<&str, Result<FenData, FenParseError
 
     return Ok((
         tail,
-        Ok(FenData {
+        Ok(Fen {
             pieces: expand_piece_placement(pieces),
             white_to_move: side == 'w',
             castling_permissions: expand_castling_permissions(castle),
@@ -508,7 +470,7 @@ mod tests {
             let index = StandardIndex::try_from(i as u8).unwrap();
             assert_eq!(
                 default.get_piece_at(index).map(|x| x.to_owned()),
-                data.as_board()
+                data.into_board()
                     .get_piece_at(index.into())
                     .map(|x| x.to_owned().into())
             )
@@ -538,7 +500,7 @@ mod tests {
             let index = StandardIndex::try_from(i as u8).unwrap();
             assert_eq!(
                 default.get_piece_at(index).map(|x| x.to_owned()),
-                data.as_board()
+                data.into_board()
                     .get_piece_at(index.into())
                     .map(|x| x.to_owned().into())
             )
@@ -558,7 +520,7 @@ mod tests {
         let data = parse_fen_string(move1).unwrap().1.unwrap();
 
         assert_eq!(
-            data.as_board()
+            data.into_board()
                 .get_piece_at(StandardIndex::try_from(28u8).unwrap().into()),
             Some(&StandardPiece::WhitePawn.into())
         );
@@ -578,18 +540,18 @@ mod tests {
         let move2 = "rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq c6 0 2";
         let data = parse_fen_string(move2).unwrap().1.unwrap();
         assert_eq!(
-            data.as_board()
+            data.into_board()
                 .get_piece_at(StandardIndex::try_from(28u8).unwrap().into()),
             Some(&StandardPiece::WhitePawn.into())
         );
         assert_eq!(
-            data.as_board()
+            data.into_board()
                 .get_piece_at(StandardIndex::try_from(34u8).unwrap().into()),
             Some(&StandardPiece::BlackPawn.into())
         );
         assert_eq!(
             // check black pawn has properly moved
-            data.as_board()
+            data.into_board()
                 .get_piece_at(StandardIndex::try_from(50u8).unwrap().into()),
             None
         );
@@ -610,23 +572,23 @@ mod tests {
         let move3 = "rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2";
         let data = parse_fen_string(move3).unwrap().1.unwrap();
         assert_eq!(
-            data.as_board()
+            data.into_board()
                 .get_piece_at(StandardIndex::try_from(28u8).unwrap().into()),
             Some(&StandardPiece::WhitePawn.into())
         );
         assert_eq!(
-            data.as_board()
+            data.into_board()
                 .get_piece_at(StandardIndex::try_from(34u8).unwrap().into()),
             Some(&StandardPiece::BlackPawn.into())
         );
         assert_eq!(
             // check black pawn has properly moved
-            data.as_board()
+            data.into_board()
                 .get_piece_at(StandardIndex::try_from(50u8).unwrap().into()),
             None
         );
         assert_eq!(
-            data.as_board()
+            data.into_board()
                 .get_piece_at(StandardIndex::try_from(21u8).unwrap().into()),
             Some(&StandardPiece::WhiteKnight.into())
         );
