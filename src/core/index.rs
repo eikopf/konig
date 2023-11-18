@@ -18,7 +18,8 @@ pub enum IndexError<T> {
 ///
 /// Indices on a chessboard form a set of positions equipped
 /// with a notion of distance between them, and so they form
-/// a metric space. The obvious example of this is the [Chebyshev
+/// a [metric space](https://en.wikipedia.org/wiki/Metric_space).
+/// The obvious example of this is the [Chebyshev
 /// distance](https://en.wikipedia.org/wiki/Chebyshev_distance),
 /// which describes the distance between squares on a
 /// standard chessboard (from the perspective of the king).

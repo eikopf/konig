@@ -27,9 +27,9 @@ impl IllegalMoveError for IllegalStandardMoveError {
 /// including illegal moves.
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub struct StandardMove {
-    /// The position to take a [`Piece`] from.
+    /// The position to take a [piece](crate::standard::piece::StandardPiece) from.
     pub source: StandardIndex,
-    /// The position to move a [`Piece`] to.
+    /// The position to move a [piece](crate::standard::piece::StandardPiece) to.
     pub target: StandardIndex,
 }
 
