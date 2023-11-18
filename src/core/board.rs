@@ -41,7 +41,9 @@ pub trait Process: Validate {
     /// Note that the only valid source for the candidate move is from [`Validate`]'s
     /// `validate` method, and in general you should prefer `validate_and_process` for
     /// updating the board's state with a single [`Move`].
-    fn process(&self, candidate: Self::LegalMove) -> Self;
+    fn process(&self, candidate: Self::LegalMove) -> Self
+    where
+        Self: Sized;
 
     /// First validates the given candidate move, and then either returns an [`IllegalMoveError`]
     /// or uses the resulting [`LegalMove`] to update the board state and returns it.

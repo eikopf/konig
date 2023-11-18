@@ -40,5 +40,7 @@ pub trait Index {
     /// These are the axioms which a metric space must uphold,
     /// though in general most intutitive notions of distance will
     /// already fulfil these requirements.
-    fn distance(a: Self, b: Self) -> Self::MetricTarget;
+    fn distance(a: Self, b: Self) -> Self::MetricTarget
+    where
+        Self: Sized;
 }

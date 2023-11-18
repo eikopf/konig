@@ -20,8 +20,8 @@ A Rust-based chess engine, built to support custom implementations and chess var
 - [ ] `konig::io`
   - Parsing (and streaming?) for common chess formats.
   - [ ] Implement `konig::io::fen`.
-    - [x] Review: should `FenData.as_board` return a `StandardBoard`, or a custom `Board`?
-    - [x] Finalise the API on `FenData`.
+    - [x] Review: should `Fen.as_board` return a `StandardBoard`, or a custom `Board`?
+    - [x] Finalise the API on `Fen`.
     - [ ] Add significant testing from real-world datasets.
     - [ ] Add and review documentation.
   - [ ] Implement `konig::io::san`.
