@@ -6,7 +6,7 @@ use konig::standard::piece::StandardPiece;
 #[test]
 fn check_apis() {
     let index = StandardIndex::new(4);
-    let fen_board = Fen::default().as_board();
+    let fen_board = Fen::default().into_board();
     let white_king = fen_board.get_piece_at(index.into());
 
     assert_eq!(
