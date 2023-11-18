@@ -12,7 +12,7 @@ pub mod fen;
 mod pgn;
 
 /// Provides utilities for Standard Algebraic Notation (SAN).
-mod san;
+pub mod san;
 
 // NOTE: this is a list of standards to look at implementing after the core four
 // - FEEN: https://github.com/sashite/specs/blob/main/forsyth-edwards-expanded-notation.md
