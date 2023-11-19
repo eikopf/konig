@@ -26,7 +26,7 @@ A Rust-based chess engine, built to support custom implementations and chess var
     - [ ] Add significant testing from real-world datasets.
     - [ ] Add and review documentation.
   - [ ] Implement `konig::io::san`.
-    - [ ] Create structs and basic API.
+    - [x] Create public API and basic definitions.
     - [ ] Implement parser with `nom`.
     - [ ] Add significant testing from real-world datasets.
     - [ ] Add and review documentation.
