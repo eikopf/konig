@@ -19,3 +19,4 @@ pub mod san;
 // - X-FEN: https://en.wikipedia.org/wiki/X-FEN
 // - Shredder-FEN: https://www.chessprogramming.org/Forsyth-Edwards_Notation#Shredder-FEN
 //      - This probably requires an implementation of Chess960
+// - UCI: https://www.chessprogramming.org/UCI
