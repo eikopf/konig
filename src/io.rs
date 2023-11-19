@@ -22,3 +22,6 @@ pub mod san;
 // - UCI: https://www.chessprogramming.org/UCI
 //      - This really requires a full game implementation with a playing AI first.
 // - ICCF numeric notation: https://en.wikipedia.org/wiki/ICCF_numeric_notation
+
+pub use fen::Fen;
+pub use san::San;
