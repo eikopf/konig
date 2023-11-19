@@ -13,10 +13,12 @@ use nom::{
     branch::alt,
     branch::permutation,
     bytes::complete::tag,
-    character::complete::one_of,
-    combinator::opt,
-    sequence::{pair, preceded, tuple, Tuple},
-    IResult, Parser,
+    character::complete::{multispace0, one_of},
+    combinator::cut,
+    combinator::{all_consuming, opt},
+    error::VerboseError,
+    sequence::{pair, preceded, terminated, tuple, Tuple},
+    Finish, IResult, Parser,
 };
 use thiserror::Error;
 
@@ -83,6 +85,7 @@ pub enum ParseError<'a> {
 /// valid SAN literal.
 ///
 /// Parsing is provided via the `TryFrom<&'a str>` impl.
+#[derive(Debug, PartialEq, Eq)]
 pub struct San {
     data: SanData,
     is_check: bool,
@@ -91,10 +94,10 @@ pub struct San {
 }
 
 impl<'a> TryFrom<&'a str> for San {
-    type Error = ParseError<'a>;
+    type Error = VerboseError<&'a str>;
 
     fn try_from(value: &'a str) -> Result<Self, Self::Error> {
-        san_literal(value)
+        san_literal(value).finish().map(|(_, san)| san)
     }
 }
 
@@ -106,6 +109,7 @@ impl<'a> TryFrom<&'a str> for San {
 /// conveyed by the literal, but needs a [`Board`](crate::core::Board) to be converted
 /// into a [`Move`](crate::core::Move), and a [`Validate`](crate::core::Validate) to be converted into a
 /// [`LegalMove`](crate::core::LegalMove).
+#[derive(Debug, Eq, PartialEq)]
 enum SanData {
     AbbreviatedPawnMove(AbbreviatedPawnMove),
     CastleMove(CastleMove),
@@ -126,6 +130,7 @@ enum SanData {
 /// and checkmate; hence when parsing a SAN-castle literal you
 /// still must check for the common check/checkmate suffixes. As
 /// usual, you also want to look for the annotation suffixes as well.
+#[derive(Debug, Eq, PartialEq)]
 enum CastleMove {
     QueenSide,
     KingSide,
@@ -139,6 +144,7 @@ enum CastleMove {
 /// is optionally followed by a disambiguating field, and then the optional
 /// capture indicator. This is followed by a mandatory target square. Finally,
 /// we also include the optional check, checkmate, and annotation suffixes.
+#[derive(Debug, Eq, PartialEq)]
 struct NormalMove {
     piece: StandardPieceKind,
     disambiguation_field: Option<DisambiguationField>,
@@ -152,6 +158,7 @@ struct NormalMove {
 /// A pawn move is little more than a normal move with no
 /// leading character, and which permits an additional
 /// promotion piece component.
+#[derive(Debug, Eq, PartialEq)]
 struct PawnMove {
     target: (char, char),
     is_capture: bool,
@@ -165,6 +172,7 @@ struct PawnMove {
 /// Abbreviated pawn moves are hugely contextual; they are limited
 /// to listing just the source and target files, with a capture
 /// glyph in between if necessary.
+#[derive(Debug, Eq, PartialEq)]
 struct AbbreviatedPawnMove {
     source_rank: char,
     target_rank: char,
@@ -201,19 +209,22 @@ enum SuffixAnnotation {
     HookHook, // blunder
 }
 
+type SanResult<'a, T> = IResult<&'a str, T, VerboseError<&'a str>>;
+
 /// Parses the pattern [?!]?[?!]?.
-fn annotation<'a>(source: &'a str) -> IResult<&str, SuffixAnnotation> {
+fn annotation<'a>(source: &'a str) -> SanResult<Option<SuffixAnnotation>> {
     let mut annotation = pair(opt(one_of("!?")), opt(one_of("!?")));
     annotation.parse(source).map(|(tail, pair)| {
         (
             tail,
             match pair {
-                (Some('?'), None) => SuffixAnnotation::Hook,
-                (Some('!'), None) => SuffixAnnotation::Bang,
-                (Some('?'), Some('?')) => SuffixAnnotation::HookHook,
-                (Some('?'), Some('!')) => SuffixAnnotation::HookBang,
-                (Some('!'), Some('!')) => SuffixAnnotation::BangBang,
-                (Some('!'), Some('?')) => SuffixAnnotation::BangHook,
+                (None, None) => None,
+                (Some('?'), None) => Some(SuffixAnnotation::Hook),
+                (Some('!'), None) => Some(SuffixAnnotation::Bang),
+                (Some('?'), Some('?')) => Some(SuffixAnnotation::HookHook),
+                (Some('?'), Some('!')) => Some(SuffixAnnotation::HookBang),
+                (Some('!'), Some('!')) => Some(SuffixAnnotation::BangBang),
+                (Some('!'), Some('?')) => Some(SuffixAnnotation::BangHook),
                 _ => unreachable!(),
             },
         )
@@ -221,21 +232,21 @@ fn annotation<'a>(source: &'a str) -> IResult<&str, SuffixAnnotation> {
 }
 
 /// Parses the symbol [+] and returns true if it finds it.
-fn check<'a>(source: &'a str) -> IResult<&str, bool> {
+fn check<'a>(source: &'a str) -> SanResult<bool> {
     tag("+")
         .parse(source)
         .map(|(tail, symbol)| (tail, symbol == "+"))
 }
 
 /// Parses the symbol [#] and returns true if it finds it.
-fn checkmate<'a>(source: &'a str) -> IResult<&str, bool> {
+fn checkmate<'a>(source: &'a str) -> SanResult<bool> {
     tag("#")
         .parse(source)
         .map(|(tail, symbol)| (tail, symbol == "#"))
 }
 
 /// Parses a piece of the form [KQBNR].
-fn piece<'a>(source: &'a str) -> IResult<&str, StandardPieceKind> {
+fn piece<'a>(source: &'a str) -> SanResult<StandardPieceKind> {
     one_of("KQBNR").parse(source).map(|(tail, piece)| {
         (
             tail,
@@ -252,26 +263,27 @@ fn piece<'a>(source: &'a str) -> IResult<&str, StandardPieceKind> {
 }
 
 /// Parses a single file character of the form [abcdefgh]
-fn file<'a>(source: &'a str) -> IResult<&str, char> {
+fn file<'a>(source: &'a str) -> SanResult<char> {
     one_of("abcdefgh").parse(source)
 }
 
 /// Parses a target position with the form [abcdefgh][12345678].
-fn target<'a>(source: &'a str) -> IResult<&str, (char, char)> {
+fn target<'a>(source: &'a str) -> SanResult<(char, char)> {
     let mut target = pair(one_of("abcdefgh"), one_of("12345678"));
     target.parse(source)
 }
 
 /// Parses a disambiguation field with the form [abcdefgh]?[12345678]?.
-fn disambiguation_field<'a>(source: &'a str) -> IResult<&str, DisambiguationField> {
+fn disambiguation_field<'a>(source: &'a str) -> SanResult<Option<DisambiguationField>> {
     let mut disambiguation_field = pair(opt(one_of("abcdefgh")), opt(one_of("12345678")));
     disambiguation_field.parse(source).map(|(tail, field)| {
         (
             tail,
             match field {
-                (Some(file), None) => DisambiguationField::FileLetter(file),
-                (None, Some(rank)) => DisambiguationField::RankDigit(rank),
-                (Some(file), Some(rank)) => DisambiguationField::SourceSquare((file, rank)),
+                (None, None) => None,
+                (Some(file), None) => Some(DisambiguationField::FileLetter(file)),
+                (None, Some(rank)) => Some(DisambiguationField::RankDigit(rank)),
+                (Some(file), Some(rank)) => Some(DisambiguationField::SourceSquare((file, rank))),
                 _ => unreachable!(),
             },
         )
@@ -279,15 +291,15 @@ fn disambiguation_field<'a>(source: &'a str) -> IResult<&str, DisambiguationFiel
 }
 
 /// Parses a single capture symbol that can appear in a SAN literal.
-fn capture<'a>(source: &'a str) -> IResult<&str, char> {
+fn capture<'a>(source: &'a str) -> SanResult<char> {
     let mut capture = one_of("xX×:");
     capture.parse(source)
 }
 
 /// Parses the "=[RNBQ]" segment that can appear at the end of a pawn move.
-fn promotion<'a>(source: &'a str) -> IResult<&str, StandardPieceKind> {
+fn promotion<'a>(source: &'a str) -> SanResult<StandardPieceKind> {
     let promotion_piece = one_of("RNBQ");
-    let mut promotion = preceded(tag("="), promotion_piece);
+    let mut promotion = preceded(tag("="), cut(promotion_piece));
     promotion.parse(source).map(|(tail, piece)| {
         (
             tail,
@@ -303,7 +315,7 @@ fn promotion<'a>(source: &'a str) -> IResult<&str, StandardPieceKind> {
 }
 
 /// Parses a move of the form [abcdefgh][capture]?[abcefgh][promotion]?.
-fn abbreviated_pawn_move<'a>(source: &'a str) -> IResult<&str, AbbreviatedPawnMove> {
+fn abbreviated_pawn_move<'a>(source: &'a str) -> SanResult<SanData> {
     let mut abbrev_move = tuple((
         one_of("abcdefgh"),
         opt(capture),
@@ -315,100 +327,113 @@ fn abbreviated_pawn_move<'a>(source: &'a str) -> IResult<&str, AbbreviatedPawnMo
         .map(|(tail, (source, capture, target, promotion))| {
             (
                 tail,
-                AbbreviatedPawnMove {
+                SanData::AbbreviatedPawnMove(AbbreviatedPawnMove {
                     source_rank: source,
                     target_rank: target,
                     is_capture: capture.is_some(),
                     promotion_piece: promotion,
-                },
+                }),
             )
         })
 }
 
 /// Parses a pawn move of the form ([abcdefgh]x)?(target)(promotion)?.
-fn pawn_move<'a>(source: &'a str) -> IResult<&str, PawnMove> {
+fn pawn_move<'a>(source: &'a str) -> SanResult<SanData> {
     let mut pawn_move = tuple((opt(pair(file, capture)), target, opt(promotion)));
     pawn_move
         .parse(source)
         .map(|(tail, (file_capture_block, target, promotion))| {
             (
                 tail,
-                PawnMove {
+                SanData::PawnMove(PawnMove {
                     target,
                     is_capture: file_capture_block.is_some(),
                     capture_rank: file_capture_block.map(|(file, _)| file),
                     promotion_piece: promotion,
-                },
+                }),
             )
         })
 }
 
 /// Parses a castle move with the form [0O]-[0O](-[0O])?.
-fn castle_move<'a>(source: &'a str) -> IResult<&str, CastleMove> {
+fn castle_move<'a>(source: &'a str) -> SanResult<SanData> {
     let mut castle = alt((tag("0-0"), tag("O-O"), tag("0-0-0"), tag("O-O-O")));
     castle.parse(source).map(|(tail, castle)| {
         (
             tail,
-            match castle {
+            SanData::CastleMove(match castle {
                 "O-O" | "0-0" => CastleMove::KingSide,
                 "O-O-O" | "0-0-0" => CastleMove::QueenSide,
                 _ => unreachable!(),
-            },
+            }),
         )
     })
 }
 
 /// Parses a normal (non-pawn) move with the form [piece][disambiguation_field]?[capture]?[target].
-fn normal_move<'a>(source: &'a str) -> IResult<&str, NormalMove> {
-    let mut normal_move = tuple((piece, opt(disambiguation_field), opt(capture), target));
+fn normal_move<'a>(source: &'a str) -> SanResult<SanData> {
+    let mut normal_move = tuple((piece, disambiguation_field, opt(capture), target));
     normal_move
         .parse(source)
         .map(|(tail, (piece, disambiguation_field, capture, target))| {
             (
                 tail,
-                NormalMove {
+                SanData::NormalMove(NormalMove {
                     piece,
                     disambiguation_field,
                     target,
                     is_capture: capture.is_some(),
-                },
+                }),
             )
         })
 }
 
 /// Parses a complete SAN literal.
-fn san_literal<'a>(source: &'a str) -> Result<San, ParseError> {
-    let mut san_literal = (
-        opt(castle_move),
-        opt(abbreviated_pawn_move),
-        opt(pawn_move),
-        opt(normal_move),
+fn san_literal<'a>(source: &'a str) -> SanResult<San> {
+    let san_literal = tuple((
+        alt((castle_move, abbreviated_pawn_move, pawn_move, normal_move)),
         opt(permutation((check, checkmate))),
-        opt(annotation),
-    );
+        annotation,
+    ));
 
-    let (tail, result) = san_literal.parse(source).unwrap();
+    let mut san_parser = all_consuming(san_literal);
+    let (tail, (data, check_state, annotation)) = san_parser.parse(source)?;
 
-    if tail.len() > 0 {
-        return Err(ParseError::TrailingGarbage(tail));
+    Ok((
+        tail,
+        San {
+            data,
+            is_check: check_state.is_some_and(|(check, _)| check),
+            is_checkmate: check_state.is_some_and(|(_, checkmate)| checkmate),
+            annotation,
+        },
+    ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn basic_san_parsing() {
+        san_literal("e5").unwrap();
+        san_literal("Kxd3??").unwrap();
+        san_literal("fxg=Q+#!").unwrap();
     }
 
-    let data = if let Some(castle_move) = result.0 {
-        Ok(SanData::CastleMove(castle_move))
-    } else if let Some(abbreviated_pawn_move) = result.1 {
-        Ok(SanData::AbbreviatedPawnMove(abbreviated_pawn_move))
-    } else if let Some(pawn_move) = result.2 {
-        Ok(SanData::PawnMove(pawn_move))
-    } else if let Some(normal_move) = result.3 {
-        Ok(SanData::NormalMove(normal_move))
-    } else {
-        Err(ParseError::Unknown)
-    }?;
+    #[test]
+    fn correct_errors_from_san_parsing() {
+        san_literal("fxd=+#!").expect_err("should fail without a promotion piece");
+        san_literal("fd!!!").expect_err("should fail because of too many exclamation marks");
+        san_literal("").expect_err("should fail because it's empty");
+    }
 
-    Ok(San {
-        data,
-        is_check: result.4.is_some_and(|(check, _)| check),
-        is_checkmate: result.4.is_some_and(|(_, checkmate)| checkmate),
-        annotation: result.5,
-    })
+    #[test]
+    fn parse_promotion_chunk_correctly() {
+        promotion("=Q").expect("should return a StandardPieceKind::Queen.");
+        promotion("=").expect_err("should fail with no piece kind");
+        promotion("=A").expect_err("should fail");
+        promotion("B").expect_err("should fail");
+        promotion("").expect_err("should fail");
+    }
 }
