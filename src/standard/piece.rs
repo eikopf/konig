@@ -39,7 +39,7 @@ pub enum StandardColor {
 }
 
 /// Represents the standard set of chess piece kinds.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub enum StandardPieceKind {
     /// A pawn.
     Pawn,
