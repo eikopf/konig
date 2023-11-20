@@ -10,14 +10,12 @@
 // appendix C of their Laws of Chess document: https://handbook.fide.com/chapter/E012023
 
 use nom::{
-    branch::alt,
-    branch::permutation,
+    branch::{alt, permutation},
     bytes::complete::tag,
-    character::complete::{multispace0, one_of},
-    combinator::cut,
-    combinator::{all_consuming, opt},
-    error::VerboseError,
-    sequence::{pair, preceded, terminated, tuple, Tuple},
+    character::complete::one_of,
+    combinator::{complete, cut, not, opt, rest},
+    error::{ContextError, VerboseError},
+    sequence::{pair, preceded, tuple},
     Finish, IResult, Parser,
 };
 use thiserror::Error;
@@ -211,7 +209,7 @@ enum SuffixAnnotation {
 
 type SanResult<'a, T> = IResult<&'a str, T, VerboseError<&'a str>>;
 
-/// Parses the pattern [?!]?[?!]?.
+/// Parses the pattern \[?!\]?\[?!\]?.
 fn annotation<'a>(source: &'a str) -> SanResult<Option<SuffixAnnotation>> {
     let mut annotation = pair(opt(one_of("!?")), opt(one_of("!?")));
     annotation.parse(source).map(|(tail, pair)| {
@@ -357,13 +355,19 @@ fn pawn_move<'a>(source: &'a str) -> SanResult<SanData> {
 
 /// Parses a castle move with the form [0O]-[0O](-[0O])?.
 fn castle_move<'a>(source: &'a str) -> SanResult<SanData> {
-    let mut castle = alt((tag("0-0"), tag("O-O"), tag("0-0-0"), tag("O-O-O")));
-    castle.parse(source).map(|(tail, castle)| {
+    // the order here is load-bearing
+    let mut castle = tuple((
+        alt((tag("0-0-0"), tag("O-O-O"), tag("0-0"), tag("O-O"))),
+        not(capture),
+        not(promotion),
+    ));
+    castle.parse(source).map(|(tail, (castle, _, _))| {
         (
             tail,
             SanData::CastleMove(match castle {
-                "O-O" | "0-0" => CastleMove::KingSide,
+                // the order here is load-bearing
                 "O-O-O" | "0-0-0" => CastleMove::QueenSide,
+                "O-O" | "0-0" => CastleMove::KingSide,
                 _ => unreachable!(),
             }),
         )
@@ -372,10 +376,15 @@ fn castle_move<'a>(source: &'a str) -> SanResult<SanData> {
 
 /// Parses a normal (non-pawn) move with the form [piece][disambiguation_field]?[capture]?[target].
 fn normal_move<'a>(source: &'a str) -> SanResult<SanData> {
-    let mut normal_move = tuple((piece, disambiguation_field, opt(capture), target));
-    normal_move
-        .parse(source)
-        .map(|(tail, (piece, disambiguation_field, capture, target))| {
+    let mut normal_move = tuple((
+        piece,
+        disambiguation_field,
+        opt(capture),
+        target,
+        not(promotion),
+    ));
+    normal_move.parse(source).map(
+        |(tail, (piece, disambiguation_field, capture, target, _))| {
             (
                 tail,
                 SanData::NormalMove(NormalMove {
@@ -385,27 +394,36 @@ fn normal_move<'a>(source: &'a str) -> SanResult<SanData> {
                     is_capture: capture.is_some(),
                 }),
             )
-        })
+        },
+    )
 }
 
 /// Parses a complete SAN literal.
 fn san_literal<'a>(source: &'a str) -> SanResult<San> {
     let san_literal = tuple((
         alt((castle_move, abbreviated_pawn_move, pawn_move, normal_move)),
-        opt(permutation((check, checkmate))),
+        opt(permutation((opt(check), opt(checkmate)))),
         annotation,
+        rest,
     ));
 
-    let mut san_parser = all_consuming(san_literal);
-    let (tail, (data, check_state, annotation)) = san_parser.parse(source)?;
+    let mut san_parser = complete(san_literal);
+    let (tail, (data, check_state, annotation, rest)) = san_parser.parse(source)?;
+
+    println!("rest: {}", rest);
+    if rest.len() > 0 {
+        let empty_err = VerboseError { errors: Vec::new() };
+        let err = VerboseError::add_context(source, "Found trailing garbage.", empty_err);
+        return Err(nom::Err::Failure(err));
+    }
 
     Ok((
         tail,
         San {
             data,
-            is_check: check_state.is_some_and(|(check, _)| check),
-            is_checkmate: check_state.is_some_and(|(_, checkmate)| checkmate),
             annotation,
+            is_check: check_state.is_some_and(|(check, _)| check.is_some()),
+            is_checkmate: check_state.is_some_and(|(_, checkmate)| checkmate.is_some()),
         },
     ))
 }
@@ -419,6 +437,13 @@ mod tests {
         san_literal("e5").unwrap();
         san_literal("Kxd3??").unwrap();
         san_literal("fxg=Q+#!").unwrap();
+        san_literal("0-0").unwrap();
+        san_literal("O-O").unwrap();
+        san_literal("0-0-0").unwrap();
+        san_literal("O-O-O").unwrap();
+        san_literal("ab").unwrap();
+        san_literal("dxe=R?!").unwrap();
+        san_literal("O-O-O#!").unwrap();
     }
 
     #[test]
@@ -426,6 +451,9 @@ mod tests {
         san_literal("fxd=+#!").expect_err("should fail without a promotion piece");
         san_literal("fd!!!").expect_err("should fail because of too many exclamation marks");
         san_literal("").expect_err("should fail because it's empty");
+        san_literal("D:e7").expect_err("should fail because it's not a real piece");
+        san_literal("0-0-0-0").expect_err("should fail because it's not a valid castling move");
+        san_literal("0-0-0x!").expect_err("castle moves cannot be captures");
     }
 
     #[test]
@@ -435,5 +463,61 @@ mod tests {
         promotion("=A").expect_err("should fail");
         promotion("B").expect_err("should fail");
         promotion("").expect_err("should fail");
+    }
+
+    #[test]
+    fn parse_castle_move_correctly() {
+        // valid moves
+        castle_move("0-0").expect("should be valid");
+        castle_move("0-0-0").expect("should be valid");
+        castle_move("O-O").expect("should be valid");
+        castle_move("O-O-O").expect("should be valid");
+        castle_move("0-0+").expect("should be valid");
+        castle_move("0-0-0+").expect("should be valid");
+        castle_move("O-O+").expect("should be valid");
+        castle_move("O-O-O+").expect("should be valid");
+        castle_move("0-0#").expect("should be valid");
+        castle_move("0-0-0#").expect("should be valid");
+        castle_move("O-O#").expect("should be valid");
+        castle_move("O-O-O#").expect("should be valid");
+        castle_move("0-0+#").expect("should be valid");
+        castle_move("0-0-0+#").expect("should be valid");
+        castle_move("O-O+#").expect("should be valid");
+        castle_move("O-O-O+#").expect("should be valid");
+        castle_move("0-0").expect("should be valid");
+        castle_move("0-0-0").expect("should be valid");
+        castle_move("O-O").expect("should be valid");
+        castle_move("O-O-O").expect("should be valid");
+        castle_move("0-0+").expect("should be valid");
+        castle_move("0-0-0+").expect("should be valid");
+        castle_move("O-O+").expect("should be valid");
+        castle_move("O-O-O+").expect("should be valid");
+        castle_move("0-0#").expect("should be valid");
+        castle_move("0-0-0#").expect("should be valid");
+        castle_move("O-O#?!").expect("should be valid");
+        castle_move("O-O-O#?").expect("should be valid");
+        castle_move("0-0+#??").expect("should be valid");
+        castle_move("0-0-0+#!").expect("should be valid");
+        castle_move("O-O+#!?").expect("should be valid");
+        castle_move("O-O-O+#!!").expect("should be valid");
+
+        // invalid moves
+        castle_move("xO-O-O").expect_err("castle moves cannot capture");
+        castle_move("0-0x").expect_err("castle moves cannot capture");
+        castle_move("O-Ox+!!").expect_err("castle moves cannot capture");
+        castle_move("O-O-O=Q").expect_err("kings cannot promote");
+        castle_move("0-0=R#").expect_err("kings cannot promote");
+    }
+
+    #[test]
+    fn parse_normal_moves_correctly() {
+        // valid moves
+        normal_move("Bxe7").expect("should be a valid move");
+
+        // TODO: broken, probably due to disambiguation field
+        normal_move("Ka1??").expect("should be a valid move");
+
+        // invalid moves
+        normal_move("R:d4=Q").expect_err("non-pawns cannot promote");
     }
 }
