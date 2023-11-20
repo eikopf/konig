@@ -25,11 +25,11 @@ A Rust-based chess engine, built to support custom implementations and chess var
     - [x] Finalise the API on `Fen`.
     - [ ] Add significant testing from real-world datasets.
     - [ ] Add and review documentation.
-  - [ ] Implement `konig::io::san`.
+  - [x] Implement `konig::io::san`.
     - [x] Create public API and basic definitions.
-    - [ ] Implement parser with `nom`.
-    - [ ] Add significant testing from real-world datasets.
-    - [ ] Add and review documentation.
+    - [x] Implement parser with `nom`.
+    - [x] Add significant testing from real-world datasets.
+    - [x] Add and review documentation.
   - Implementations for [EPD](https://www.chessprogramming.org/Extended_Position_Description) and [PGN](https://www.chessprogramming.org/Portable_Game_Notation) are blocked until a later time when a `konig::core::game::Game` trait is implemented (likely deferred to `v0.3.0`)
 
 ## Usage

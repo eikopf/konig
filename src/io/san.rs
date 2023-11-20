@@ -25,8 +25,10 @@ use crate::standard::piece::StandardPieceKind;
 
 /// The error returned when attempting to
 /// parse an invalid SAN literal.
+///
+/// `TODO`: replace the public facing error in [`San`] with this.
 #[derive(Error, Debug)]
-pub enum ParseError<'a> {
+enum ParseError<'a> {
     /// Returned if the optional leading character of the literal is invalid
     #[error("Expected one of 'O', 'K', 'Q', 'B', 'R', 'N'; got {0}")]
     InvalidLeadingPiece(char),
@@ -155,7 +157,7 @@ struct NormalMove {
 ///
 /// ## Rough Specification
 /// A pawn move is little more than a normal move with no
-/// leading character, and which permits an additional
+/// leading character, and which admits an additional
 /// promotion piece component.
 #[derive(Debug, Eq, PartialEq, Clone)]
 struct PawnMove {
@@ -398,7 +400,7 @@ fn normal_move(source: &str) -> SanResult<SanData> {
 /// Parses a complete SAN literal.
 fn san_literal(source: &str) -> SanResult<San> {
     let san_literal = tuple((
-        alt((castle_move, abbreviated_pawn_move, pawn_move, normal_move)),
+        alt((castle_move, pawn_move, abbreviated_pawn_move, normal_move)),
         opt(permutation((opt(check), opt(checkmate)))),
         annotation,
         rest,
@@ -407,10 +409,9 @@ fn san_literal(source: &str) -> SanResult<San> {
     let mut san_parser = complete(san_literal);
     let (tail, (data, check_state, annotation, rest)) = san_parser.parse(source)?;
 
-    println!("rest: {}", rest);
     if rest.len() > 0 {
         let empty_err = VerboseError { errors: Vec::new() };
-        let err = VerboseError::add_context(source, "Found trailing garbage.", empty_err);
+        let err = VerboseError::add_context(rest, "Found trailing garbage.", empty_err);
         return Err(nom::Err::Failure(err));
     }
 
@@ -535,5 +536,25 @@ mod tests {
         San::try_from("c2").expect("should be a valid move");
         San::try_from("Nf3h4").expect("should be a valid move");
         San::try_from("Rb2xb7#").expect("should be a valid move");
+        San::try_from("e4").expect("should be a valid move");
+        San::try_from("e6").expect("should be a valid move");
+        San::try_from("d4").expect("should be a valid move");
+        San::try_from("d5").expect("should be a valid move");
+        San::try_from("Nc3").expect("should be a valid move");
+        San::try_from("Bb4").expect("should be a valid move");
+        San::try_from("Ne2").expect("should be a valid move");
+        San::try_from("dxe4").expect("should be a valid move");
+        San::try_from("a3").expect("should be a valid move");
+        San::try_from("Be7").expect("should be a valid move");
+        San::try_from("Nxe4??").expect("should be a valid move");
+        San::try_from("Nf6").expect("should be a valid move");
+        San::try_from("Qd3").expect("should be a valid move");
+        San::try_from("Nbd7").expect("should be a valid move");
+        San::try_from("N2c3").expect("should be a valid move");
+        San::try_from("O-O").expect("should be a valid move");
+        San::try_from("dxc4+").expect("should be a valid move");
+        San::try_from("Ne3+").expect("should be a valid move");
+        San::try_from("Bc3+").expect("should be a valid move");
+        San::try_from("axb5").expect("should be a valid move");
     }
 }
