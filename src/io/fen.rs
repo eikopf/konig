@@ -3,20 +3,21 @@ use crate::core::index::Index;
 use crate::core::piece::Piece;
 use crate::standard::board::{StandardBoard, StandardCastlingPermissions};
 use crate::standard::index::StandardIndex;
-use crate::standard::piece::StandardPiece;
+use crate::standard::piece::{StandardColor, StandardPiece};
 
 use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::character::complete::{one_of, space0, space1, u16, u8};
-use nom::combinator::opt;
+use nom::character::complete::{char, one_of, space0, space1, u16, u8};
+use nom::combinator::{eof, opt, success, verify};
+use nom::error::{ErrorKind, ParseError as NomParseError, VerboseError};
 use nom::multi::{many_m_n, separated_list1};
 use nom::sequence::{pair, Tuple};
-use nom::{Finish, IResult};
+use nom::{Finish, IResult, Parser};
 use thiserror::Error;
 
 /// Represents the ways in which a FEN string may be invalid.
 #[derive(Error, Debug)]
-pub enum FenParseError {
+enum ParseError {
     /// Occurs if the first component of the FEN string is invalid.
     #[error("invalid FEN representation of piece placement")]
     InvalidPositionComponent,
@@ -76,11 +77,10 @@ type PieceArray = [Option<StandardPiece>; 64];
 /// by the [`Default`] impl, i.e:
 ///
 /// ```
-/// use konig::io::fen::Fen;
+/// use konig::io::Fen;
+/// use konig::io::fen::FEN_STARTING_POSITION;
 ///
-/// let from_string =
-///     Fen::try_from("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
-///     .unwrap();
+/// let from_string = Fen::try_from(FEN_STARTING_POSITION).unwrap();
 /// let from_default = Fen::default();
 /// assert_eq!(from_string, from_default); // <= succeeds
 /// ```
@@ -94,24 +94,21 @@ pub struct Fen {
     fullmove_counter: u16,
 }
 
+/// The initial position of a standard chess game as a FEN string.
+pub const FEN_STARTING_POSITION: &'static str =
+    "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
 impl Default for Fen {
     fn default() -> Self {
-        let (_, res) =
-            parse_fen_string("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1").unwrap();
-
-        res.unwrap() // safe unwrap
+        Fen::try_from(FEN_STARTING_POSITION).unwrap()
     }
 }
 
 impl<'a> TryFrom<&'a str> for Fen {
-    type Error = FenParseError;
+    type Error = VerboseError<&'a str>;
 
     fn try_from(value: &'a str) -> Result<Self, Self::Error> {
-        match parse_fen_string(value).finish() {
-            Ok((_, Ok(data))) => Ok(data),
-            Ok((_, Err(err))) => Err(err),
-            Err(_) => Err(FenParseError::UnknownError),
-        }
+        Ok(fen_literal(value).finish()?.1)
     }
 }
 
@@ -216,25 +213,108 @@ impl From<Fen> for FenBoard {
     }
 }
 
-/// Entrypoint to FEN string parsing.
-///
-/// This function is made available in the public API via
-/// [`Fen`]'s [`TryFrom`] implementation.
-fn parse_fen_string(source: &str) -> IResult<&str, Result<Fen, FenParseError>> {
-    // piece placement grammar
-    // let digit17 = one_of::<&str, &str, nom::error::Error<_>>("1234567");
-    // let white_piece = one_of("PNBRQK");
-    // let black_piece = one_of("pnbrqk");
-    // let piece = alt((white_piece, black_piece));
-    // let rank_component = pair(opt(digit17), piece);
-    let rank = many_m_n(1, 8, one_of("12345678pnbrqkPNBRQK"));
-    let piece_placement = separated_list1(tag("/"), rank);
+/// The return type of the parsers in this module.
+type FenResult<'a, T> = IResult<&'a str, T, VerboseError<&'a str>>;
 
-    // side to move grammar
-    let side_to_move = one_of("wb");
+/// Parses a single digit character from 1 to 8, i.e. \[12345678\].
+fn digit18(source: &str) -> FenResult<char> {
+    let mut digit18 = one_of("12345678");
+    digit18.parse(source)
+}
 
-    // castling ability grammar
-    let castling_ability = alt((
+/// Parses a single piece character of the form \[pnbrqkPNBRQK\].
+fn piece(source: &str) -> FenResult<char> {
+    let mut piece = one_of("pnbrqkPNBRQK");
+    piece.parse(source)
+}
+
+/// Parses a single rank field into the component pieces.
+fn rank<'a>(source: &'a str) -> FenResult<[Option<StandardPiece>; 8]> {
+    let mut pieces = [None; 8];
+    let mut index: usize = 0; // write-index into pieces
+    let mut rank = many_m_n(1, 8, alt((digit18, piece)));
+
+    let new_err = |input: &'a str, kind: ErrorKind| {
+        let err = VerboseError::from_error_kind(input, kind);
+        Err(nom::Err::Failure(err))
+    };
+
+    let (tail, rank) = rank.parse(source)?;
+    for character in rank {
+        match character {
+            space @ '1'..='8' => {
+                let length = ((space as u8) - 48) as usize;
+                let initial_index = index;
+                while index < initial_index + length {
+                    if index >= 8 {
+                        return new_err(tail, ErrorKind::TooLarge);
+                    };
+                    pieces[index] = None;
+                    index += 1;
+                }
+            }
+
+            piece @ _ => {
+                pieces[index] = match piece {
+                    'p' => Some(StandardPiece::BlackPawn),
+                    'n' => Some(StandardPiece::BlackKnight),
+                    'b' => Some(StandardPiece::BlackBishop),
+                    'r' => Some(StandardPiece::BlackRook),
+                    'q' => Some(StandardPiece::BlackQueen),
+                    'k' => Some(StandardPiece::BlackKing),
+                    'P' => Some(StandardPiece::WhitePawn),
+                    'N' => Some(StandardPiece::WhiteKnight),
+                    'B' => Some(StandardPiece::WhiteBishop),
+                    'R' => Some(StandardPiece::WhiteRook),
+                    'Q' => Some(StandardPiece::WhiteQueen),
+                    'K' => Some(StandardPiece::WhiteKing),
+                    _ => unreachable!(),
+                };
+
+                index += 1;
+            }
+        }
+    }
+
+    Ok((tail, pieces))
+}
+
+/// Parses the entire piece placement field, with ranks flattened.
+fn piece_placement(source: &str) -> FenResult<PieceArray> {
+    let mut piece_placement = verify(separated_list1(tag("/"), rank), |v: &Vec<_>| v.len() == 8);
+    piece_placement.parse(source).map(|(tail, mut files)| {
+        (tail, {
+            // this will succeed iff we have exactly 8 ranks,
+            // which is guaranteed by the verify parser
+            // wrapped around the separated_list1.
+            //
+            // you could also do this in unsafe
+            // with unwrap_unchecked, but bounds checks
+            // are cheap and segfaults are infuriating.
+            files.reverse();
+            files.flatten().try_into().unwrap()
+        })
+    })
+}
+
+/// Parses the entire side-to-move field, which is simply \[wb\].
+fn side_to_move(source: &str) -> FenResult<StandardColor> {
+    let mut side_to_move = one_of("wb");
+    side_to_move.parse(source).map(|(tail, side)| {
+        (
+            tail,
+            match side {
+                'w' => StandardColor::White,
+                'b' => StandardColor::Black,
+                _ => unreachable!(),
+            },
+        )
+    })
+}
+
+/// Parses the entire castling-ability field.
+fn castling_ability(source: &str) -> FenResult<StandardCastlingPermissions> {
+    let mut castling_ability = alt((
         // the order of the tags is loadbearing
         tag("-"),
         tag("KQkq"),
@@ -254,19 +334,147 @@ fn parse_fen_string(source: &str) -> IResult<&str, Result<Fen, FenParseError>> {
         tag("K"),
     ));
 
-    // en passant target square grammar
-    let ep_rank = one_of("36");
-    // let ep_square = pair(file, ep_rank);
-    let en_passant_target_square = pair(one_of("-abcdefgh"), opt(ep_rank));
+    castling_ability.parse(source).map(|(tail, permissions)| {
+        (
+            tail,
+            match permissions {
+                "-" => StandardCastlingPermissions::none(),
 
-    // halfmove clock grammar
-    let halfmove_clock = u8;
+                "K" => StandardCastlingPermissions {
+                    white_king_side: true,
+                    ..StandardCastlingPermissions::none()
+                },
 
-    // fullmove counter grammar
-    let fullmove_counter = u16;
+                "Q" => StandardCastlingPermissions {
+                    white_queen_side: true,
+                    ..StandardCastlingPermissions::none()
+                },
 
-    // finally parse
-    let mut fen_parser = (
+                "k" => StandardCastlingPermissions {
+                    black_king_side: true,
+                    ..StandardCastlingPermissions::none()
+                },
+
+                "q" => StandardCastlingPermissions {
+                    black_queen_side: true,
+                    ..StandardCastlingPermissions::none()
+                },
+
+                "KQ" => StandardCastlingPermissions {
+                    white_king_side: true,
+                    white_queen_side: true,
+                    ..StandardCastlingPermissions::none()
+                },
+
+                "Kk" => StandardCastlingPermissions {
+                    white_king_side: true,
+                    black_king_side: true,
+                    ..StandardCastlingPermissions::none()
+                },
+
+                "Kq" => StandardCastlingPermissions {
+                    white_king_side: true,
+                    black_queen_side: true,
+                    ..StandardCastlingPermissions::none()
+                },
+
+                "Qk" => StandardCastlingPermissions {
+                    white_queen_side: true,
+                    black_king_side: true,
+                    ..StandardCastlingPermissions::none()
+                },
+
+                "Qq" => StandardCastlingPermissions {
+                    white_queen_side: true,
+                    black_queen_side: true,
+                    ..StandardCastlingPermissions::none()
+                },
+
+                "kq" => StandardCastlingPermissions {
+                    black_king_side: true,
+                    black_queen_side: true,
+                    ..StandardCastlingPermissions::none()
+                },
+
+                "KQk" => StandardCastlingPermissions {
+                    white_king_side: true,
+                    white_queen_side: true,
+                    black_king_side: true,
+                    black_queen_side: false,
+                },
+
+                "KQq" => StandardCastlingPermissions {
+                    white_king_side: true,
+                    white_queen_side: true,
+                    black_king_side: false,
+                    black_queen_side: true,
+                },
+
+                "Kkq" => StandardCastlingPermissions {
+                    white_king_side: true,
+                    white_queen_side: false,
+                    black_king_side: true,
+                    black_queen_side: true,
+                },
+
+                "Qkq" => StandardCastlingPermissions {
+                    white_king_side: false,
+                    white_queen_side: true,
+                    black_king_side: true,
+                    black_queen_side: true,
+                },
+
+                "KQkq" => StandardCastlingPermissions::default(),
+
+                _ => unreachable!(),
+            },
+        )
+    })
+}
+
+/// Parses the entire en-passant-target-square field.
+fn en_passant_target_square(source: &str) -> FenResult<Option<StandardIndex>> {
+    // return a dummy success value to make this a pair
+    let ep_empty = pair(char('-'), success('-'));
+    let ep_square = pair(one_of("abcdefgh"), one_of("36"));
+    let mut en_passant_target_square = alt((ep_empty, ep_square));
+
+    en_passant_target_square.parse(source).map(|(tail, pair)| {
+        (
+            tail,
+            match pair {
+                ('-', '-') => None,
+                (file, rank) => {
+                    let rank_offset = match rank {
+                        '3' => 16,
+                        '6' => 40,
+                        _ => unreachable!(),
+                    };
+                    let file_offset = (file as u8) - 97;
+
+                    // this is entirely safe, it only gets called if the field is parsed correctly
+                    unsafe { Some(StandardIndex::new_unchecked(rank_offset + file_offset)) }
+                }
+            },
+        )
+    })
+}
+
+/// Parses the entire halfmove-clock field
+fn halfmove_clock(source: &str) -> FenResult<u8> {
+    let mut halfmove_clock = verify(u8, |&clock| clock <= 100);
+    halfmove_clock.parse(source)
+}
+
+/// Parses the entire fullmove-counter field
+fn fullmove_counter(source: &str) -> FenResult<u16> {
+    let mut fullmove_counter = u16;
+    fullmove_counter.parse(source)
+}
+
+/// Parses a complete FEN literal.
+fn fen_literal(source: &str) -> FenResult<Fen> {
+    let mut fen_literal = (
         piece_placement,
         space1,
         side_to_move,
@@ -278,181 +486,38 @@ fn parse_fen_string(source: &str) -> IResult<&str, Result<Fen, FenParseError>> {
         halfmove_clock,
         space1,
         fullmove_counter,
-        space0,
+        eof,
     );
 
-    let (tail, (pieces, _, side, _, castle, _, ep, _, half, _, full, _)) =
-        fen_parser.parse(source)?;
+    let (
+        _tail,
+        (
+            pieces,
+            _,
+            side_to_move,
+            _,
+            castling_permissions,
+            _,
+            en_passant_square,
+            _,
+            halfmove_clock,
+            _,
+            fullmove_counter,
+            _,
+        ),
+    ) = fen_literal.parse(source)?;
 
-    // error handling
-    if tail.len() > 0 {
-        return Ok((tail, Err(FenParseError::TrailingGarbage)));
-    }
-
-    if pieces.len() > 8 {
-        return Ok((tail, Err(FenParseError::TooManyRanks)));
-    } else if pieces.len() < 8 {
-        return Ok((tail, Err(FenParseError::TooFewRanks)));
-    }
-
-    if ep.0 == '-' && ep.1 != None {
-        return Ok((
-            tail,
-            Err(FenParseError::InvalidEnPassantTargetSquareComponent),
-        ));
-    } else if ep.0 != '-' && ep.1 == None {
-        return Ok((
-            tail,
-            Err(FenParseError::InvalidEnPassantTargetSquareComponent),
-        ));
-    }
-
-    if half > 100 {
-        return Ok((tail, Err(FenParseError::InvalidHalfmoveClockComponent)));
-    }
-
-    return Ok((
-        tail,
-        Ok(Fen {
-            pieces: expand_piece_placement(pieces),
-            white_to_move: side == 'w',
-            castling_permissions: expand_castling_permissions(castle),
-            en_passant_square: expand_en_passant_target_square(ep),
-            halfmove_clock: half,
-            fullmove_counter: full,
-        }),
-    ));
-}
-
-/// Converts a parsed piece placement component into an array of pieces.
-///
-/// This function assumes its input is valid, and will panic otherwise.
-fn expand_piece_placement(source: Vec<Vec<char>>) -> PieceArray {
-    let mut pieces = [None; 64];
-    let mut i: usize = 0; // write index into pieces array
-
-    for rank in source.into_iter().rev() {
-        for c in rank {
-            match c {
-                blank @ '1'..='8' => i += blank.to_digit(10).unwrap() as usize,
-                piece @ _ => {
-                    pieces[i] = Some(StandardPiece::try_from(piece).unwrap().into());
-                    i += 1;
-                }
-            }
-        }
-    }
-
-    pieces
-}
-
-/// Converts a parsed castling permissions component into a [`StandardCastlingPermissions`].
-///
-/// This function assumes its input is valid, and will panic otherwise.
-fn expand_castling_permissions(source: &str) -> StandardCastlingPermissions {
-    match source {
-        "-" => StandardCastlingPermissions::none(),
-
-        "K" => StandardCastlingPermissions {
-            white_king_side: true,
-            ..StandardCastlingPermissions::none()
+    Ok((
+        _tail,
+        Fen {
+            pieces,
+            white_to_move: side_to_move == StandardColor::White,
+            castling_permissions,
+            en_passant_square,
+            halfmove_clock,
+            fullmove_counter,
         },
-
-        "Q" => StandardCastlingPermissions {
-            white_queen_side: true,
-            ..StandardCastlingPermissions::none()
-        },
-
-        "k" => StandardCastlingPermissions {
-            black_king_side: true,
-            ..StandardCastlingPermissions::none()
-        },
-
-        "q" => StandardCastlingPermissions {
-            black_queen_side: true,
-            ..StandardCastlingPermissions::none()
-        },
-
-        "KQ" => StandardCastlingPermissions {
-            white_king_side: true,
-            white_queen_side: true,
-            ..StandardCastlingPermissions::none()
-        },
-
-        "Kk" => StandardCastlingPermissions {
-            white_king_side: true,
-            black_king_side: true,
-            ..StandardCastlingPermissions::none()
-        },
-
-        "Kq" => StandardCastlingPermissions {
-            white_king_side: true,
-            black_queen_side: true,
-            ..StandardCastlingPermissions::none()
-        },
-
-        "Qk" => StandardCastlingPermissions {
-            white_queen_side: true,
-            black_king_side: true,
-            ..StandardCastlingPermissions::none()
-        },
-
-        "Qq" => StandardCastlingPermissions {
-            white_queen_side: true,
-            black_queen_side: true,
-            ..StandardCastlingPermissions::none()
-        },
-
-        "kq" => StandardCastlingPermissions {
-            black_king_side: true,
-            black_queen_side: true,
-            ..StandardCastlingPermissions::none()
-        },
-
-        "KQk" => StandardCastlingPermissions {
-            white_king_side: true,
-            white_queen_side: true,
-            black_king_side: true,
-            black_queen_side: false,
-        },
-
-        "KQq" => StandardCastlingPermissions {
-            white_king_side: true,
-            white_queen_side: true,
-            black_king_side: false,
-            black_queen_side: true,
-        },
-
-        "Kkq" => StandardCastlingPermissions {
-            white_king_side: true,
-            white_queen_side: false,
-            black_king_side: true,
-            black_queen_side: true,
-        },
-
-        "Qkq" => StandardCastlingPermissions {
-            white_king_side: false,
-            white_queen_side: true,
-            black_king_side: true,
-            black_queen_side: true,
-        },
-
-        "KQkq" => StandardCastlingPermissions::default(),
-
-        _ => panic!("bad input"),
-    }
-}
-
-/// Converts a parsed en passant target square component into an [`Option<StandardIndex>`].
-///
-/// This function assumes its input is valid, and will panic otherwise.
-fn expand_en_passant_target_square(source: (char, Option<char>)) -> Option<StandardIndex> {
-    match source {
-        ('-', None) => None,
-        (rank, Some('3')) => Some(StandardIndex::try_from(16 + (rank as u8) - 97).unwrap()),
-        (rank, Some('6')) => Some(StandardIndex::try_from(40 + (rank as u8) - 97).unwrap()),
-        _ => unreachable!(),
-    }
+    ))
 }
 
 #[cfg(test)]
@@ -463,7 +528,7 @@ mod tests {
     #[test]
     fn check_fen_parser_on_initial_position() {
         let start = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-        let data = parse_fen_string(start).unwrap().1.unwrap();
+        let data = Fen::try_from(start).unwrap();
         let default = StandardBoard::default();
 
         for i in 0..=63 {
@@ -492,7 +557,7 @@ mod tests {
 
         // INITIAL STATE
         let start = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-        let data = parse_fen_string(start).unwrap().1.unwrap();
+        let data = Fen::try_from(start).unwrap();
         let default = StandardBoard::default();
 
         // for each position on the board, check that the pieces match
@@ -517,7 +582,7 @@ mod tests {
 
         // GAME AFTER 1. e4
         let move1 = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1";
-        let data = parse_fen_string(move1).unwrap().1.unwrap();
+        let data = Fen::try_from(move1).unwrap();
 
         assert_eq!(
             data.into_board()
@@ -538,7 +603,7 @@ mod tests {
 
         // GAME AFTER 1. e4 c5
         let move2 = "rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq c6 0 2";
-        let data = parse_fen_string(move2).unwrap().1.unwrap();
+        let data = Fen::try_from(move2).unwrap();
         assert_eq!(
             data.into_board()
                 .get_piece_at(StandardIndex::try_from(28u8).unwrap().into()),
@@ -570,7 +635,7 @@ mod tests {
 
         // GAME AFTER 1. e4 c5 2. Nf3
         let move3 = "rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2";
-        let data = parse_fen_string(move3).unwrap().1.unwrap();
+        let data = Fen::try_from(move3).unwrap();
         assert_eq!(
             data.into_board()
                 .get_piece_at(StandardIndex::try_from(28u8).unwrap().into()),
@@ -606,7 +671,7 @@ mod tests {
     // taken from https://gist.github.com/peterellisjones/8c46c28141c162d1d8a0f0badbc9cff9
     //
     // on the commandline, do `set FEN_JSON = <link-to-raw-json>`, and then
-    // use the command curl $FEN_JSON | jq ".[] | .fen" | sed "s/\$/,/g" to
+    // use the command `curl $FEN_JSON | jq ".[] | .fen" | sed "s/\$/,/g"` to
     // get the fen strings correctly formatted.
     #[test]
     fn check_fen_parser_on_misc_moves() {
@@ -637,7 +702,24 @@ mod tests {
         ];
 
         for string in fen_strings {
-            Fen::try_from(string).expect("valid fen position");
+            let fen = Fen::try_from(string).expect(string);
+            println!(
+                "parsed {}; got this:\nwhite_to_move: {:?}, ep square: {:?}\nhalfmove clock: {}, fullmove counter: {}\ncastling perms: {:?}\nboard:\n8: {:?}\n7: {:?}\n6: {:?}\n5: {:?}\n4: {:?}\n3: {:?}\n2: {:?}\n1: {:?}\n",
+                string,
+                fen.white_to_move,
+                fen.en_passant_square,
+                fen.halfmove_clock,
+                fen.fullmove_counter,
+                fen.castling_permissions,
+                &fen.pieces[56..64],
+                &fen.pieces[48..56],
+                &fen.pieces[40..48],
+                &fen.pieces[32..40],
+                &fen.pieces[24..32],
+                &fen.pieces[16..24],
+                &fen.pieces[8..16],
+                &fen.pieces[0..8],
+            )
         }
     }
 }
