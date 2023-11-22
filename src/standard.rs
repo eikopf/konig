@@ -2,14 +2,17 @@
 
 mod bitboard;
 
-/// Defines a `StandardBoard` and related concepts.
+/// Defines a [`Board`] and related concepts.
 pub mod board;
 
-/// Defines a `StandardIndex` and related concepts.
-pub mod index;
+/// Defines a [`Square`] and related concepts.
+pub mod square;
 
 /// Defines a `StandardMove` and `LegalStandardMove`.
 pub mod r#move;
 
 /// Defines a `StandardPiece` and related concepts.
 pub mod piece;
+
+pub use board::Board;
+pub use square::Square;

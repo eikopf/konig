@@ -1,45 +1,46 @@
-use super::{board::StandardBoard, index::StandardIndex};
-use crate::core::r#move::{IllegalMoveError, LegalMove, Move, WrapMove};
+use super::{board::Board, square::Square};
+use crate::core;
+use crate::core::r#move;
 use thiserror::Error;
 
 /// Results when a [`StandardMove`] cannot be converted into a [`LegalStandardMove`]
 #[derive(Debug, Error)]
-pub enum IllegalStandardMoveError {
+pub enum IllegalMoveError {
     /// Results when a [`StandardMove`] is illegal because the friendly king is in check.
     #[error("Invalid move {0:?}: the friendly king is in check.")]
-    Check(StandardMove),
+    Check(Move),
     /// Results when a [`StandardMove`] is illegal because it has an invalid source index.
     #[error("Invalid move source: {0:?}")]
-    InvalidSource(StandardIndex),
+    InvalidSource(Square),
     /// Results when a [`StandardMove`] is illegal because it has an invalid target index.
     #[error("Invalid move target: {0:?}")]
-    InvalidTarget(StandardIndex),
+    InvalidTarget(Square),
 }
 
-impl IllegalMoveError for IllegalStandardMoveError {
-    type Board = StandardBoard;
-    type Index = StandardIndex;
-    type Move = StandardMove;
-    type LegalMove = LegalStandardMove;
+impl r#move::IllegalMoveError for IllegalMoveError {
+    type Board = Board;
+    type Index = Square;
+    type Move = Move;
+    type LegalMove = LegalMove;
 }
 
 /// Represents a possible move on a `StandardBoard`,
 /// including illegal moves.
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
-pub struct StandardMove {
+pub struct Move {
     /// The position to take a [piece](crate::standard::piece::StandardPiece) from.
-    source: StandardIndex,
+    source: Square,
     /// The position to move a [piece](crate::standard::piece::StandardPiece) to.
-    target: StandardIndex,
+    target: Square,
 }
 
 /// Represents a legal move on a `StandardBoard`.
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
-pub struct LegalStandardMove(StandardMove);
+pub struct LegalMove(Move);
 
-impl Move for StandardMove {
-    type Board = StandardBoard;
-    type Index = StandardIndex;
+impl core::Move for Move {
+    type Board = Board;
+    type Index = Square;
 
     fn source(&self) -> Self::Index {
         self.source
@@ -50,9 +51,9 @@ impl Move for StandardMove {
     }
 }
 
-impl Move for LegalStandardMove {
-    type Board = StandardBoard;
-    type Index = StandardIndex;
+impl core::Move for LegalMove {
+    type Board = Board;
+    type Index = Square;
 
     fn source(&self) -> Self::Index {
         self.0.source
@@ -63,18 +64,18 @@ impl Move for LegalStandardMove {
     }
 }
 
-impl LegalMove for LegalStandardMove {
-    type Move = StandardMove;
+impl core::LegalMove for LegalMove {
+    type Move = Move;
 }
 
-impl WrapMove for LegalStandardMove {
+impl r#move::WrapMove for LegalMove {
     fn wrap(value: Self::Move) -> Self {
         Self(value)
     }
 }
 
-impl From<(StandardIndex, StandardIndex)> for StandardMove {
-    fn from(value: (StandardIndex, StandardIndex)) -> Self {
+impl From<(Square, Square)> for Move {
+    fn from(value: (Square, Square)) -> Self {
         Self {
             source: value.0,
             target: value.1,

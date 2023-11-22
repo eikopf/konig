@@ -9,7 +9,7 @@ use super::r#move::{IllegalMoveError, LegalMove, Move};
 ///
 /// For a notion of legality see [`Validate`].
 /// For a notion of moves acting on state, see [`Process`].
-pub trait Board: std::fmt::Debug {
+pub trait Position: std::fmt::Debug {
     /// Represents a specific place on the board.
     type Index: Index;
 
@@ -26,7 +26,7 @@ pub trait Board: std::fmt::Debug {
 /// This is primarily used as a trait bound in [`Validate`]
 /// and [`Process`] to add extra methods related to ordinary
 /// chessboard representations.
-pub trait Standard: Board<Piece: Piece<Color = Self::Color>> {
+pub trait Standard: Position<Piece: Piece<Color = Self::Color>> {
     /// The type representing the two sides of the game.
     type Color;
 
@@ -53,7 +53,7 @@ pub trait Standard: Board<Piece: Piece<Color = Self::Color>> {
 /// context of the [`Validate`] API itself. This can be done
 /// manually, but is most effectively implemented with an
 /// opaque type.
-pub trait Validate: Board {
+pub trait Validate: Position {
     /// Represents a move which may or may not be legal.
     type Move: Move<Board = Self, Index = Self::Index>;
     /// Represents a move which has been confirmed to be legal.
@@ -102,10 +102,9 @@ pub trait Process: Validate {
 mod tests {
     use super::*;
     use crate::standard::{
-        board::StandardBoard,
-        index::StandardIndex,
         piece::StandardPiece,
-        r#move::{IllegalStandardMoveError, LegalStandardMove, StandardMove},
+        r#move::{IllegalMoveError, LegalMove, Move},
+        Board, Square,
     };
 
     // The following tests just won't compile if their types are object-safe.
@@ -118,33 +117,33 @@ mod tests {
 
     #[test]
     fn board_is_object_safe() {
-        let _board: Box<dyn Board<Index = StandardIndex, Piece = StandardPiece>> =
-            Box::new(StandardBoard::default());
+        let _board: Box<dyn super::Position<Index = Square, Piece = StandardPiece>> =
+            Box::new(Board::default());
     }
 
     #[test]
     fn validate_is_object_safe() {
         let _validate: Box<
             dyn Validate<
-                Index = StandardIndex,
+                Index = Square,
                 Piece = StandardPiece,
-                Move = StandardMove,
-                LegalMove = LegalStandardMove,
-                ValidationError = IllegalStandardMoveError,
+                Move = Move,
+                LegalMove = LegalMove,
+                ValidationError = IllegalMoveError,
             >,
-        > = Box::new(StandardBoard::default());
+        > = Box::new(Board::default());
     }
 
     #[test]
     fn process_is_object_safe() {
         let _process: Box<
             dyn Process<
-                Index = StandardIndex,
+                Index = Square,
                 Piece = StandardPiece,
-                Move = StandardMove,
-                LegalMove = LegalStandardMove,
-                ValidationError = IllegalStandardMoveError,
+                Move = Move,
+                LegalMove = LegalMove,
+                ValidationError = IllegalMoveError,
             >,
-        > = Box::new(StandardBoard::default());
+        > = Box::new(Board::default());
     }
 }

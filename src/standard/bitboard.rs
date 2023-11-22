@@ -100,12 +100,21 @@ impl<'a> Iterator for BitBoardIterator<'a> {
     type Item = bool;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.mask == 1 << 64 {
-            None
-        } else {
-            let result = (self.board.0 | self.mask) == self.board.0;
-            self.mask <<= 1;
-            Some(result)
+        // 0 is the edge case to catch the end of the iterator
+        if self.mask == 0 {
+            return None;
         }
+
+        let result = (self.board.0 | self.mask) == self.board.0;
+
+        // if this was the last bit, set mask to end flag
+        if self.mask == 1 << 63 {
+            self.mask = 0;
+        // otherwise continue
+        } else {
+            self.mask <<= 1;
+        }
+
+        Some(result)
     }
 }

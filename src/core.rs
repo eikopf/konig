@@ -6,8 +6,9 @@ pub mod r#move;
 pub mod piece;
 
 // reexported traits
-pub use board::Board;
+pub use board::Position;
 pub use board::Process;
+pub use board::Standard;
 pub use board::Validate;
 pub use index::Index;
 pub use piece::Piece;

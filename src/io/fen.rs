@@ -1,9 +1,7 @@
-use crate::core::board::{Board, Standard};
-use crate::core::index::Index;
-use crate::core::piece::Piece;
-use crate::standard::board::{StandardBoard, StandardCastlingPermissions};
-use crate::standard::index::StandardIndex;
-use crate::standard::piece::{StandardColor, StandardPiece};
+use crate::standard::board::CastlingPermissions;
+use crate::standard::piece::{Color, StandardPiece};
+use crate::standard::Square;
+use crate::{core, standard};
 
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -87,9 +85,9 @@ type PieceArray = [Option<StandardPiece>; 64];
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Fen {
     pieces: PieceArray,
-    side_to_move: StandardColor,
-    castling_permissions: StandardCastlingPermissions,
-    en_passant_square: Option<StandardIndex>,
+    side_to_move: Color,
+    castling_permissions: CastlingPermissions,
+    en_passant_square: Option<Square>,
     halfmove_clock: u8,
     fullmove_counter: u16,
 }
@@ -116,12 +114,12 @@ impl Fen {
     /// Consumes `self` and returns a [`Standard`].
     pub fn into_board(
         self,
-    ) -> impl std::ops::Index<StandardIndex, Output = Option<StandardPiece>>
+    ) -> impl std::ops::Index<Square, Output = Option<StandardPiece>>
            + std::fmt::Debug
-           + Standard<
-        Color = StandardColor,
-        CastlingPermissions = StandardCastlingPermissions,
-        Index = StandardIndex,
+           + core::board::Standard<
+        Color = Color,
+        CastlingPermissions = CastlingPermissions,
+        Index = Square,
         Piece = StandardPiece,
     > {
         FenBoard::from(self)
@@ -133,22 +131,22 @@ impl Fen {
     /// This operation is potentially expensive, and unless you
     /// specifically need a [`StandardBoard`], you should prefer
     /// [`Fen`]'s `into_board` method.
-    pub fn to_standard_board(self) -> StandardBoard {
+    pub fn to_standard_board(self) -> standard::Board {
         self.into()
     }
 
     /// Returns a [`StandardColor`] corresponding the side whose turn it is to move.
-    pub fn side_to_move(&self) -> StandardColor {
+    pub fn side_to_move(&self) -> Color {
         self.side_to_move
     }
 
     /// Returns the castling permissions described by this FEN string.
-    pub fn castling_permissions(&self) -> StandardCastlingPermissions {
+    pub fn castling_permissions(&self) -> CastlingPermissions {
         self.castling_permissions
     }
 
     /// Returns the index of the en passant target square, if it exists.
-    pub fn en_passant_square(&self) -> Option<StandardIndex> {
+    pub fn en_passant_square(&self) -> Option<Square> {
         self.en_passant_square
     }
 
@@ -171,8 +169,8 @@ struct FenBoard {
     data: Fen,
 }
 
-impl Board for FenBoard {
-    type Index = StandardIndex;
+impl core::board::Position for FenBoard {
+    type Index = Square;
     type Piece = StandardPiece;
 
     fn get_piece_at(&self, index: Self::Index) -> Option<&Self::Piece> {
@@ -180,10 +178,10 @@ impl Board for FenBoard {
     }
 }
 
-impl Standard for FenBoard {
-    type Color = StandardColor;
+impl core::board::Standard for FenBoard {
+    type Color = Color;
 
-    type CastlingPermissions = StandardCastlingPermissions;
+    type CastlingPermissions = CastlingPermissions;
 
     fn side_to_move(&self) -> Self::Color {
         self.data.side_to_move
@@ -206,10 +204,10 @@ impl Default for FenBoard {
     }
 }
 
-impl std::ops::Index<StandardIndex> for FenBoard {
+impl std::ops::Index<Square> for FenBoard {
     type Output = Option<StandardPiece>;
 
-    fn index(&self, index: StandardIndex) -> &Self::Output {
+    fn index(&self, index: Square) -> &Self::Output {
         &self.data.pieces[usize::from(index)]
     }
 }
@@ -310,14 +308,14 @@ fn piece_placement(source: &str) -> FenResult<PieceArray> {
 }
 
 /// Parses the entire side-to-move field, which is simply \[wb\].
-fn side_to_move(source: &str) -> FenResult<StandardColor> {
+fn side_to_move(source: &str) -> FenResult<Color> {
     let mut side_to_move = one_of("wb");
     side_to_move.parse(source).map(|(tail, side)| {
         (
             tail,
             match side {
-                'w' => StandardColor::White,
-                'b' => StandardColor::Black,
+                'w' => Color::White,
+                'b' => Color::Black,
                 _ => unreachable!(),
             },
         )
@@ -325,7 +323,7 @@ fn side_to_move(source: &str) -> FenResult<StandardColor> {
 }
 
 /// Parses the entire castling-ability field.
-fn castling_ability(source: &str) -> FenResult<StandardCastlingPermissions> {
+fn castling_ability(source: &str) -> FenResult<CastlingPermissions> {
     let mut castling_ability = alt((
         // the order of the tags is loadbearing
         tag("-"),
@@ -350,93 +348,93 @@ fn castling_ability(source: &str) -> FenResult<StandardCastlingPermissions> {
         (
             tail,
             match permissions {
-                "-" => StandardCastlingPermissions::none(),
+                "-" => CastlingPermissions::none(),
 
-                "K" => StandardCastlingPermissions {
+                "K" => CastlingPermissions {
                     white_king_side: true,
-                    ..StandardCastlingPermissions::none()
+                    ..CastlingPermissions::none()
                 },
 
-                "Q" => StandardCastlingPermissions {
+                "Q" => CastlingPermissions {
                     white_queen_side: true,
-                    ..StandardCastlingPermissions::none()
+                    ..CastlingPermissions::none()
                 },
 
-                "k" => StandardCastlingPermissions {
+                "k" => CastlingPermissions {
                     black_king_side: true,
-                    ..StandardCastlingPermissions::none()
+                    ..CastlingPermissions::none()
                 },
 
-                "q" => StandardCastlingPermissions {
+                "q" => CastlingPermissions {
                     black_queen_side: true,
-                    ..StandardCastlingPermissions::none()
+                    ..CastlingPermissions::none()
                 },
 
-                "KQ" => StandardCastlingPermissions {
+                "KQ" => CastlingPermissions {
                     white_king_side: true,
                     white_queen_side: true,
-                    ..StandardCastlingPermissions::none()
+                    ..CastlingPermissions::none()
                 },
 
-                "Kk" => StandardCastlingPermissions {
+                "Kk" => CastlingPermissions {
                     white_king_side: true,
                     black_king_side: true,
-                    ..StandardCastlingPermissions::none()
+                    ..CastlingPermissions::none()
                 },
 
-                "Kq" => StandardCastlingPermissions {
+                "Kq" => CastlingPermissions {
                     white_king_side: true,
                     black_queen_side: true,
-                    ..StandardCastlingPermissions::none()
+                    ..CastlingPermissions::none()
                 },
 
-                "Qk" => StandardCastlingPermissions {
+                "Qk" => CastlingPermissions {
                     white_queen_side: true,
                     black_king_side: true,
-                    ..StandardCastlingPermissions::none()
+                    ..CastlingPermissions::none()
                 },
 
-                "Qq" => StandardCastlingPermissions {
+                "Qq" => CastlingPermissions {
                     white_queen_side: true,
                     black_queen_side: true,
-                    ..StandardCastlingPermissions::none()
+                    ..CastlingPermissions::none()
                 },
 
-                "kq" => StandardCastlingPermissions {
+                "kq" => CastlingPermissions {
                     black_king_side: true,
                     black_queen_side: true,
-                    ..StandardCastlingPermissions::none()
+                    ..CastlingPermissions::none()
                 },
 
-                "KQk" => StandardCastlingPermissions {
+                "KQk" => CastlingPermissions {
                     white_king_side: true,
                     white_queen_side: true,
                     black_king_side: true,
                     black_queen_side: false,
                 },
 
-                "KQq" => StandardCastlingPermissions {
+                "KQq" => CastlingPermissions {
                     white_king_side: true,
                     white_queen_side: true,
                     black_king_side: false,
                     black_queen_side: true,
                 },
 
-                "Kkq" => StandardCastlingPermissions {
+                "Kkq" => CastlingPermissions {
                     white_king_side: true,
                     white_queen_side: false,
                     black_king_side: true,
                     black_queen_side: true,
                 },
 
-                "Qkq" => StandardCastlingPermissions {
+                "Qkq" => CastlingPermissions {
                     white_king_side: false,
                     white_queen_side: true,
                     black_king_side: true,
                     black_queen_side: true,
                 },
 
-                "KQkq" => StandardCastlingPermissions::default(),
+                "KQkq" => CastlingPermissions::default(),
 
                 _ => unreachable!(),
             },
@@ -445,7 +443,7 @@ fn castling_ability(source: &str) -> FenResult<StandardCastlingPermissions> {
 }
 
 /// Parses the entire en-passant-target-square field.
-fn en_passant_target_square(source: &str) -> FenResult<Option<StandardIndex>> {
+fn en_passant_target_square(source: &str) -> FenResult<Option<Square>> {
     // return a dummy success value to make this a pair
     let ep_empty = pair(char('-'), success('-'));
     let ep_square = pair(one_of("abcdefgh"), one_of("36"));
@@ -465,7 +463,7 @@ fn en_passant_target_square(source: &str) -> FenResult<Option<StandardIndex>> {
                     let file_offset = (file as u8) - 97;
 
                     // this is entirely safe, it only gets called if the field is parsed correctly
-                    unsafe { Some(StandardIndex::new_unchecked(rank_offset + file_offset)) }
+                    unsafe { Some(Square::new_unchecked(rank_offset + file_offset)) }
                 }
             },
         )
@@ -535,16 +533,16 @@ fn fen_literal(source: &str) -> FenResult<Fen> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::standard::board::StandardBoard;
+    use crate::{core::Position, standard::board::Board};
 
     #[test]
     fn check_fen_parser_on_initial_position() {
         let start = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
         let data = Fen::try_from(start).unwrap();
-        let default = StandardBoard::default();
+        let default = Board::default();
 
         for i in 0..=63 {
-            let index = StandardIndex::try_from(i as u8).unwrap();
+            let index = Square::try_from(i as u8).unwrap();
             assert_eq!(
                 default.get_piece_at(index).map(|x| x.to_owned()),
                 data.into_board()
@@ -553,11 +551,8 @@ mod tests {
             )
         }
 
-        assert_eq!(data.side_to_move, StandardColor::White);
-        assert_eq!(
-            data.castling_permissions,
-            StandardCastlingPermissions::default()
-        );
+        assert_eq!(data.side_to_move, Color::White);
+        assert_eq!(data.castling_permissions, CastlingPermissions::default());
         assert_eq!(data.en_passant_square, None);
         assert_eq!(data.halfmove_clock, 0);
         assert_eq!(data.fullmove_counter, 1);
@@ -570,11 +565,11 @@ mod tests {
         // INITIAL STATE
         let start = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
         let data = Fen::try_from(start).unwrap();
-        let default = StandardBoard::default();
+        let default = Board::default();
 
         // for each position on the board, check that the pieces match
         for i in 0..=63 {
-            let index = StandardIndex::try_from(i as u8).unwrap();
+            let index = Square::try_from(i as u8).unwrap();
             assert_eq!(
                 default.get_piece_at(index).map(|x| x.to_owned()),
                 data.into_board()
@@ -583,11 +578,8 @@ mod tests {
             )
         }
 
-        assert_eq!(data.side_to_move, StandardColor::White);
-        assert_eq!(
-            data.castling_permissions,
-            StandardCastlingPermissions::default()
-        );
+        assert_eq!(data.side_to_move, Color::White);
+        assert_eq!(data.castling_permissions, CastlingPermissions::default());
         assert_eq!(data.en_passant_square, None);
         assert_eq!(data.halfmove_clock, 0);
         assert_eq!(data.fullmove_counter, 1);
@@ -598,17 +590,14 @@ mod tests {
 
         assert_eq!(
             data.into_board()
-                .get_piece_at(StandardIndex::try_from(28u8).unwrap().into()),
+                .get_piece_at(Square::try_from(28u8).unwrap().into()),
             Some(&StandardPiece::WhitePawn.into())
         );
-        assert_eq!(data.side_to_move, StandardColor::Black);
-        assert_eq!(
-            data.castling_permissions,
-            StandardCastlingPermissions::default()
-        );
+        assert_eq!(data.side_to_move, Color::Black);
+        assert_eq!(data.castling_permissions, CastlingPermissions::default());
         assert_eq!(
             data.en_passant_square,
-            Some(StandardIndex::try_from(20u8).unwrap())
+            Some(Square::try_from(20u8).unwrap())
         );
         assert_eq!(data.halfmove_clock, 0);
         assert_eq!(data.fullmove_counter, 1);
@@ -618,29 +607,26 @@ mod tests {
         let data = Fen::try_from(move2).unwrap();
         assert_eq!(
             data.into_board()
-                .get_piece_at(StandardIndex::try_from(28u8).unwrap().into()),
+                .get_piece_at(Square::try_from(28u8).unwrap().into()),
             Some(&StandardPiece::WhitePawn.into())
         );
         assert_eq!(
             data.into_board()
-                .get_piece_at(StandardIndex::try_from(34u8).unwrap().into()),
+                .get_piece_at(Square::try_from(34u8).unwrap().into()),
             Some(&StandardPiece::BlackPawn.into())
         );
         assert_eq!(
             // check black pawn has properly moved
             data.into_board()
-                .get_piece_at(StandardIndex::try_from(50u8).unwrap().into()),
+                .get_piece_at(Square::try_from(50u8).unwrap().into()),
             None
         );
 
-        assert_eq!(data.side_to_move, StandardColor::White);
-        assert_eq!(
-            data.castling_permissions,
-            StandardCastlingPermissions::default()
-        );
+        assert_eq!(data.side_to_move, Color::White);
+        assert_eq!(data.castling_permissions, CastlingPermissions::default());
         assert_eq!(
             data.en_passant_square,
-            Some(StandardIndex::try_from(42u8).unwrap())
+            Some(Square::try_from(42u8).unwrap())
         );
         assert_eq!(data.halfmove_clock, 0);
         assert_eq!(data.fullmove_counter, 2);
@@ -650,31 +636,28 @@ mod tests {
         let data = Fen::try_from(move3).unwrap();
         assert_eq!(
             data.into_board()
-                .get_piece_at(StandardIndex::try_from(28u8).unwrap().into()),
+                .get_piece_at(Square::try_from(28u8).unwrap().into()),
             Some(&StandardPiece::WhitePawn.into())
         );
         assert_eq!(
             data.into_board()
-                .get_piece_at(StandardIndex::try_from(34u8).unwrap().into()),
+                .get_piece_at(Square::try_from(34u8).unwrap().into()),
             Some(&StandardPiece::BlackPawn.into())
         );
         assert_eq!(
             // check black pawn has properly moved
             data.into_board()
-                .get_piece_at(StandardIndex::try_from(50u8).unwrap().into()),
+                .get_piece_at(Square::try_from(50u8).unwrap().into()),
             None
         );
         assert_eq!(
             data.into_board()
-                .get_piece_at(StandardIndex::try_from(21u8).unwrap().into()),
+                .get_piece_at(Square::try_from(21u8).unwrap().into()),
             Some(&StandardPiece::WhiteKnight.into())
         );
 
-        assert_eq!(data.side_to_move, StandardColor::Black);
-        assert_eq!(
-            data.castling_permissions,
-            StandardCastlingPermissions::default()
-        );
+        assert_eq!(data.side_to_move, Color::Black);
+        assert_eq!(data.castling_permissions, CastlingPermissions::default());
         assert_eq!(data.en_passant_square, None);
         assert_eq!(data.halfmove_clock, 1);
         assert_eq!(data.fullmove_counter, 2);

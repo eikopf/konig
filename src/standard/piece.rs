@@ -31,7 +31,7 @@ pub enum StandardPiece {
 
 /// Represents the standard set of chess piece colors.
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
-pub enum StandardColor {
+pub enum Color {
     /// The second-playing side.
     Black,
     /// The first-playing side.
@@ -56,23 +56,23 @@ pub enum StandardPieceKind {
 }
 
 impl Piece for StandardPiece {
-    type Color = StandardColor;
+    type Color = Color;
     type Kind = StandardPieceKind;
 
     fn color(&self) -> Self::Color {
         match self {
-            Self::BlackPawn => StandardColor::Black,
-            Self::BlackRook => StandardColor::Black,
-            Self::BlackKnight => StandardColor::Black,
-            Self::BlackBishop => StandardColor::Black,
-            Self::BlackQueen => StandardColor::Black,
-            Self::BlackKing => StandardColor::Black,
-            Self::WhitePawn => StandardColor::White,
-            Self::WhiteRook => StandardColor::White,
-            Self::WhiteKnight => StandardColor::White,
-            Self::WhiteBishop => StandardColor::White,
-            Self::WhiteQueen => StandardColor::White,
-            Self::WhiteKing => StandardColor::White,
+            Self::BlackPawn => Color::Black,
+            Self::BlackRook => Color::Black,
+            Self::BlackKnight => Color::Black,
+            Self::BlackBishop => Color::Black,
+            Self::BlackQueen => Color::Black,
+            Self::BlackKing => Color::Black,
+            Self::WhitePawn => Color::White,
+            Self::WhiteRook => Color::White,
+            Self::WhiteKnight => Color::White,
+            Self::WhiteBishop => Color::White,
+            Self::WhiteQueen => Color::White,
+            Self::WhiteKing => Color::White,
         }
     }
 
@@ -95,18 +95,18 @@ impl Piece for StandardPiece {
 
     fn new(color: Self::Color, kind: Self::Kind) -> Self {
         match (color, kind) {
-            (StandardColor::Black, StandardPieceKind::Pawn) => Self::BlackPawn,
-            (StandardColor::Black, StandardPieceKind::Rook) => Self::BlackRook,
-            (StandardColor::Black, StandardPieceKind::Knight) => Self::BlackKnight,
-            (StandardColor::Black, StandardPieceKind::Bishop) => Self::BlackBishop,
-            (StandardColor::Black, StandardPieceKind::Queen) => Self::BlackQueen,
-            (StandardColor::Black, StandardPieceKind::King) => Self::BlackKing,
-            (StandardColor::White, StandardPieceKind::Pawn) => Self::WhitePawn,
-            (StandardColor::White, StandardPieceKind::Rook) => Self::WhiteRook,
-            (StandardColor::White, StandardPieceKind::Knight) => Self::WhiteKnight,
-            (StandardColor::White, StandardPieceKind::Bishop) => Self::WhiteBishop,
-            (StandardColor::White, StandardPieceKind::Queen) => Self::WhiteQueen,
-            (StandardColor::White, StandardPieceKind::King) => Self::WhiteKing,
+            (Color::Black, StandardPieceKind::Pawn) => Self::BlackPawn,
+            (Color::Black, StandardPieceKind::Rook) => Self::BlackRook,
+            (Color::Black, StandardPieceKind::Knight) => Self::BlackKnight,
+            (Color::Black, StandardPieceKind::Bishop) => Self::BlackBishop,
+            (Color::Black, StandardPieceKind::Queen) => Self::BlackQueen,
+            (Color::Black, StandardPieceKind::King) => Self::BlackKing,
+            (Color::White, StandardPieceKind::Pawn) => Self::WhitePawn,
+            (Color::White, StandardPieceKind::Rook) => Self::WhiteRook,
+            (Color::White, StandardPieceKind::Knight) => Self::WhiteKnight,
+            (Color::White, StandardPieceKind::Bishop) => Self::WhiteBishop,
+            (Color::White, StandardPieceKind::Queen) => Self::WhiteQueen,
+            (Color::White, StandardPieceKind::King) => Self::WhiteKing,
         }
     }
 }

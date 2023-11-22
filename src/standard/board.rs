@@ -1,20 +1,16 @@
 use std::slice::ChunksExact;
 
 use super::{
-    index::StandardIndex,
-    piece::StandardColor,
-    r#move::{IllegalStandardMoveError, LegalStandardMove, StandardMove},
+    piece::Color,
+    r#move::{IllegalMoveError, LegalMove, Move},
+    Square,
 };
 
-use crate::{
-    core::board::{Board, Process, Validate},
-    io::fen::Fen,
-    standard::piece::StandardPiece,
-};
+use crate::{core, core::Position, io::fen::Fen, standard::piece::StandardPiece};
 
 /// Represents the possible castling permissions described by a FEN string.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub struct StandardCastlingPermissions {
+pub struct CastlingPermissions {
     /// Whether or not castling on the bottom-right is allowed.
     pub white_king_side: bool,
     /// Whether or not castling on the bottom-left is allowed.
@@ -25,10 +21,10 @@ pub struct StandardCastlingPermissions {
     pub black_queen_side: bool,
 }
 
-impl StandardCastlingPermissions {
+impl CastlingPermissions {
     /// Convienience function for the empty set of castling permissions.
-    pub fn none() -> StandardCastlingPermissions {
-        StandardCastlingPermissions {
+    pub fn none() -> CastlingPermissions {
+        CastlingPermissions {
             white_king_side: false,
             white_queen_side: false,
             black_king_side: false,
@@ -37,7 +33,7 @@ impl StandardCastlingPermissions {
     }
 }
 
-impl Default for StandardCastlingPermissions {
+impl Default for CastlingPermissions {
     fn default() -> Self {
         Self {
             white_king_side: true,
@@ -53,17 +49,17 @@ impl Default for StandardCastlingPermissions {
 /// cannot be derived solely from the current
 /// state of the pieces on the board.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct StandardBoardState {
-    side_to_move: StandardColor,
-    castling_rights: StandardCastlingPermissions,
-    en_passant_square: Option<StandardIndex>,
+struct BoardState {
+    side_to_move: Color,
+    castling_rights: CastlingPermissions,
+    en_passant_square: Option<Square>,
 }
 
-impl Default for StandardBoardState {
+impl Default for BoardState {
     fn default() -> Self {
         Self {
-            side_to_move: StandardColor::White,
-            castling_rights: StandardCastlingPermissions::default(),
+            side_to_move: Color::White,
+            castling_rights: CastlingPermissions::default(),
             en_passant_square: None,
         }
     }
@@ -71,13 +67,13 @@ impl Default for StandardBoardState {
 
 /// Represents a standard 8x8 chess board.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct StandardBoard {
+pub struct Board {
     pieces: [Option<StandardPiece>; 64],
-    state: StandardBoardState,
+    state: BoardState,
 }
 
-impl Board for StandardBoard {
-    type Index = StandardIndex;
+impl core::Position for Board {
+    type Index = Square;
     type Piece = StandardPiece;
 
     fn get_piece_at(&self, index: Self::Index) -> Option<&Self::Piece> {
@@ -85,23 +81,41 @@ impl Board for StandardBoard {
     }
 }
 
-impl Validate for StandardBoard {
-    type LegalMove = LegalStandardMove;
-    type Move = StandardMove;
-    type ValidationError = IllegalStandardMoveError;
+impl core::Standard for Board {
+    type Color = Color;
+
+    type CastlingPermissions = CastlingPermissions;
+
+    fn side_to_move(&self) -> Self::Color {
+        self.state.side_to_move
+    }
+
+    fn castling_permissions(&self) -> Self::CastlingPermissions {
+        self.state.castling_rights
+    }
+
+    fn en_passant_target_square(&self) -> Option<Self::Index> {
+        self.state.en_passant_square
+    }
+}
+
+impl core::Validate for Board {
+    type LegalMove = LegalMove;
+    type Move = Move;
+    type ValidationError = IllegalMoveError;
 
     fn validate(&self, candidate: Self::Move) -> Result<Self::LegalMove, Self::ValidationError> {
         todo!()
     }
 }
 
-impl Process for StandardBoard {
+impl core::Process for Board {
     fn process(&self, candidate: Self::LegalMove) -> Self {
         todo!()
     }
 }
 
-impl Default for StandardBoard {
+impl Default for Board {
     fn default() -> Self {
         Self {
             pieces: [
@@ -170,32 +184,32 @@ impl Default for StandardBoard {
                 Some(StandardPiece::BlackKnight),
                 Some(StandardPiece::BlackRook),
             ],
-            state: StandardBoardState::default(),
+            state: BoardState::default(),
         }
     }
 }
 
-impl std::ops::Index<StandardIndex> for StandardBoard {
+impl std::ops::Index<Square> for Board {
     type Output = Option<StandardPiece>;
 
-    fn index(&self, index: StandardIndex) -> &Self::Output {
-        &self.pieces[<StandardIndex as Into<usize>>::into(index)]
+    fn index(&self, index: Square) -> &Self::Output {
+        &self.pieces[<Square as Into<usize>>::into(index)]
     }
 }
 
-impl From<Fen> for StandardBoard {
+impl From<Fen> for Board {
     fn from(value: Fen) -> Self {
         let mut pieces = [None; 64];
         let board = value.into_board();
         for i in 0..=63 {
-            let index = unsafe { StandardIndex::new_unchecked(i) };
+            let index = unsafe { Square::new_unchecked(i) };
             let piece: Option<StandardPiece> = board.get_piece_at(index.into()).map(|&p| p.into());
             pieces[i as usize] = piece;
         }
 
-        let state = StandardBoardState {
+        let state = BoardState {
             side_to_move: value.side_to_move(),
-            castling_rights: StandardCastlingPermissions {
+            castling_rights: CastlingPermissions {
                 white_king_side: value.castling_permissions().white_king_side,
                 white_queen_side: value.castling_permissions().white_queen_side,
                 black_king_side: value.castling_permissions().black_king_side,
@@ -208,40 +222,32 @@ impl From<Fen> for StandardBoard {
     }
 }
 
-impl<'a> IntoIterator for &'a StandardBoard {
-    type Item = Option<<StandardBoard as Board>::Piece>;
+impl<'a> IntoIterator for &'a Board {
+    type Item = Option<<Board as Position>::Piece>;
     type IntoIter = impl Iterator<Item = Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
-        StandardBoardIterator {
+        BoardIterator {
             board: &self,
             index: 0,
         }
     }
 }
 
-impl<'a> StandardBoard {
+impl<'a> Board {
     /// Returns an iterator over the ranks of `self`, from white to black.
     pub fn rank_iter(&'a self) -> impl Iterator<Item = &'a [Option<StandardPiece>]> {
-        StandardBoardRankIterator::from(self)
+        BoardRankIterator::from(self)
     }
 }
 
-impl StandardBoard {
-    /// Returns the side whose move is next as a [`StandardColor`].
-    pub fn side_to_move(&self) -> StandardColor {
-        self.state.side_to_move
-    }
-}
-
-/// Linear iterator over the pieces on a `StandardBoard`.
-struct StandardBoardIterator<'a> {
-    board: &'a StandardBoard,
+struct BoardIterator<'a> {
+    board: &'a Board,
     index: usize, // alignment makes u8 and usize take the same space
 }
 
-impl<'a> Iterator for StandardBoardIterator<'a> {
-    type Item = Option<<StandardBoard as Board>::Piece>;
+impl<'a> Iterator for BoardIterator<'a> {
+    type Item = Option<<Board as Position>::Piece>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.index == 64 {
@@ -254,19 +260,18 @@ impl<'a> Iterator for StandardBoardIterator<'a> {
     }
 }
 
-impl<'a> ExactSizeIterator for StandardBoardIterator<'a> {
+impl<'a> ExactSizeIterator for BoardIterator<'a> {
     fn len(&self) -> usize {
         64 - self.index
     }
 }
 
-/// Linear iterator over the ranks on a `StandardBoard`.
-struct StandardBoardRankIterator<'a> {
+struct BoardRankIterator<'a> {
     chunk_iter: ChunksExact<'a, Option<StandardPiece>>,
     index: usize,
 }
 
-impl<'a> Iterator for StandardBoardRankIterator<'a> {
+impl<'a> Iterator for BoardRankIterator<'a> {
     type Item = &'a [Option<StandardPiece>];
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -276,20 +281,20 @@ impl<'a> Iterator for StandardBoardRankIterator<'a> {
     }
 }
 
-impl<'a> ExactSizeIterator for StandardBoardRankIterator<'a> {
+impl<'a> ExactSizeIterator for BoardRankIterator<'a> {
     fn len(&self) -> usize {
         8 - self.index
     }
 }
 
-impl<'a> DoubleEndedIterator for StandardBoardRankIterator<'a> {
+impl<'a> DoubleEndedIterator for BoardRankIterator<'a> {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.chunk_iter.next_back()
     }
 }
 
-impl<'a> From<&'a StandardBoard> for StandardBoardRankIterator<'a> {
-    fn from(value: &'a StandardBoard) -> Self {
+impl<'a> From<&'a Board> for BoardRankIterator<'a> {
+    fn from(value: &'a Board) -> Self {
         Self {
             chunk_iter: value.pieces.chunks_exact(8),
             index: 0,
@@ -303,7 +308,7 @@ mod tests {
 
     #[test]
     fn standard_board_iterator_produces_correct_order() {
-        let board = StandardBoard::default();
+        let board = Board::default();
         let mut board_iter = board.into_iter();
 
         // first rank
@@ -392,10 +397,10 @@ mod tests {
 
     #[test]
     fn std_ops_index_into_standard_board_is_correct() {
-        let board = StandardBoard::default();
-        let i = StandardIndex::try_from(0u8).unwrap();
-        let j = StandardIndex::try_from(63u8).unwrap();
-        let k = StandardIndex::try_from(33u8).unwrap();
+        let board = Board::default();
+        let i = Square::try_from(0u8).unwrap();
+        let j = Square::try_from(63u8).unwrap();
+        let k = Square::try_from(33u8).unwrap();
 
         assert_eq!(board[i], Some(StandardPiece::WhiteRook));
         assert_eq!(board[j], Some(StandardPiece::BlackRook));
