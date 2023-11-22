@@ -1,5 +1,5 @@
 use crate::standard::board::CastlingPermissions;
-use crate::standard::piece::{Color, StandardPiece};
+use crate::standard::piece::{Color, Piece};
 use crate::standard::Square;
 use crate::{core, standard};
 
@@ -65,7 +65,7 @@ enum ParseError {
     UnknownError,
 }
 
-type PieceArray = [Option<StandardPiece>; 64];
+type PieceArray = [Option<Piece>; 64];
 
 /// Represents the data derived
 /// from parsing a valid FEN string.
@@ -111,31 +111,31 @@ impl<'a> TryFrom<&'a str> for Fen {
 }
 
 impl Fen {
-    /// Consumes `self` and returns a [`Standard`].
-    pub fn into_board(
+    /// Consumes `self` and returns a [`Standard`](core::Standard).
+    pub fn into_position(
         self,
-    ) -> impl std::ops::Index<Square, Output = Option<StandardPiece>>
+    ) -> impl std::ops::Index<Square, Output = Option<Piece>>
            + std::fmt::Debug
-           + core::board::Standard<
+           + core::Standard<
         Color = Color,
         CastlingPermissions = CastlingPermissions,
         Index = Square,
-        Piece = StandardPiece,
+        Piece = Piece,
     > {
         FenBoard::from(self)
     }
 
-    /// Consumes `self` and constructs a [`StandardBoard`] representing
+    /// Consumes `self` and constructs a [`Board`](crate::standard::Board) representing
     /// the same position.
     ///
     /// This operation is potentially expensive, and unless you
-    /// specifically need a [`StandardBoard`], you should prefer
-    /// [`Fen`]'s `into_board` method.
+    /// specifically need a [`Board`](crate::standard::Board), you should prefer
+    /// [`Fen`]'s `into_position` method.
     pub fn to_standard_board(self) -> standard::Board {
         self.into()
     }
 
-    /// Returns a [`StandardColor`] corresponding the side whose turn it is to move.
+    /// Returns a [`Color`] corresponding the side whose turn it is to move.
     pub fn side_to_move(&self) -> Color {
         self.side_to_move
     }
@@ -145,7 +145,7 @@ impl Fen {
         self.castling_permissions
     }
 
-    /// Returns the index of the en passant target square, if it exists.
+    /// Returns the en passant target square, if it exists.
     pub fn en_passant_square(&self) -> Option<Square> {
         self.en_passant_square
     }
@@ -163,7 +163,7 @@ impl Fen {
     }
 }
 
-/// Wraps a [`Fen`] to provide a [`Board`].
+/// Wraps a [`Fen`] to provide a [`Position`].
 #[derive(Debug, PartialEq, Eq)]
 struct FenBoard {
     data: Fen,
@@ -171,7 +171,7 @@ struct FenBoard {
 
 impl core::board::Position for FenBoard {
     type Index = Square;
-    type Piece = StandardPiece;
+    type Piece = Piece;
 
     fn get_piece_at(&self, index: Self::Index) -> Option<&Self::Piece> {
         self.data.pieces[usize::from(index)].as_ref()
@@ -205,7 +205,7 @@ impl Default for FenBoard {
 }
 
 impl std::ops::Index<Square> for FenBoard {
-    type Output = Option<StandardPiece>;
+    type Output = Option<Piece>;
 
     fn index(&self, index: Square) -> &Self::Output {
         &self.data.pieces[usize::from(index)]
@@ -234,7 +234,7 @@ fn piece(source: &str) -> FenResult<char> {
 }
 
 /// Parses a single rank field into the component pieces.
-fn rank<'a>(source: &'a str) -> FenResult<[Option<StandardPiece>; 8]> {
+fn rank<'a>(source: &'a str) -> FenResult<[Option<Piece>; 8]> {
     let mut pieces = [None; 8];
     let mut index: usize = 0; // write-index into pieces
     let mut rank = verify(
@@ -266,18 +266,18 @@ fn rank<'a>(source: &'a str) -> FenResult<[Option<StandardPiece>; 8]> {
             }
             piece @ _ => {
                 pieces[index] = match piece {
-                    'p' => Some(StandardPiece::BlackPawn),
-                    'n' => Some(StandardPiece::BlackKnight),
-                    'b' => Some(StandardPiece::BlackBishop),
-                    'r' => Some(StandardPiece::BlackRook),
-                    'q' => Some(StandardPiece::BlackQueen),
-                    'k' => Some(StandardPiece::BlackKing),
-                    'P' => Some(StandardPiece::WhitePawn),
-                    'N' => Some(StandardPiece::WhiteKnight),
-                    'B' => Some(StandardPiece::WhiteBishop),
-                    'R' => Some(StandardPiece::WhiteRook),
-                    'Q' => Some(StandardPiece::WhiteQueen),
-                    'K' => Some(StandardPiece::WhiteKing),
+                    'p' => Some(Piece::BlackPawn),
+                    'n' => Some(Piece::BlackKnight),
+                    'b' => Some(Piece::BlackBishop),
+                    'r' => Some(Piece::BlackRook),
+                    'q' => Some(Piece::BlackQueen),
+                    'k' => Some(Piece::BlackKing),
+                    'P' => Some(Piece::WhitePawn),
+                    'N' => Some(Piece::WhiteKnight),
+                    'B' => Some(Piece::WhiteBishop),
+                    'R' => Some(Piece::WhiteRook),
+                    'Q' => Some(Piece::WhiteQueen),
+                    'K' => Some(Piece::WhiteKing),
                     _ => unreachable!(),
                 };
 
@@ -542,11 +542,11 @@ mod tests {
         let default = Board::default();
 
         for i in 0..=63 {
-            let index = Square::try_from(i as u8).unwrap();
+            let sq = Square::try_from(i as u8).unwrap();
             assert_eq!(
-                default.get_piece_at(index).map(|x| x.to_owned()),
-                data.into_board()
-                    .get_piece_at(index.into())
+                default.get_piece_at(sq).map(|x| x.to_owned()),
+                data.into_position()
+                    .get_piece_at(sq.into())
                     .map(|x| x.to_owned().into())
             )
         }
@@ -569,11 +569,11 @@ mod tests {
 
         // for each position on the board, check that the pieces match
         for i in 0..=63 {
-            let index = Square::try_from(i as u8).unwrap();
+            let sq = Square::try_from(i as u8).unwrap();
             assert_eq!(
-                default.get_piece_at(index).map(|x| x.to_owned()),
-                data.into_board()
-                    .get_piece_at(index.into())
+                default.get_piece_at(sq).map(|x| x.to_owned()),
+                data.into_position()
+                    .get_piece_at(sq.into())
                     .map(|x| x.to_owned().into())
             )
         }
@@ -589,9 +589,9 @@ mod tests {
         let data = Fen::try_from(move1).unwrap();
 
         assert_eq!(
-            data.into_board()
+            data.into_position()
                 .get_piece_at(Square::try_from(28u8).unwrap().into()),
-            Some(&StandardPiece::WhitePawn.into())
+            Some(&Piece::WhitePawn.into())
         );
         assert_eq!(data.side_to_move, Color::Black);
         assert_eq!(data.castling_permissions, CastlingPermissions::default());
@@ -606,18 +606,18 @@ mod tests {
         let move2 = "rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq c6 0 2";
         let data = Fen::try_from(move2).unwrap();
         assert_eq!(
-            data.into_board()
+            data.into_position()
                 .get_piece_at(Square::try_from(28u8).unwrap().into()),
-            Some(&StandardPiece::WhitePawn.into())
+            Some(&Piece::WhitePawn.into())
         );
         assert_eq!(
-            data.into_board()
+            data.into_position()
                 .get_piece_at(Square::try_from(34u8).unwrap().into()),
-            Some(&StandardPiece::BlackPawn.into())
+            Some(&Piece::BlackPawn.into())
         );
         assert_eq!(
             // check black pawn has properly moved
-            data.into_board()
+            data.into_position()
                 .get_piece_at(Square::try_from(50u8).unwrap().into()),
             None
         );
@@ -635,25 +635,25 @@ mod tests {
         let move3 = "rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2";
         let data = Fen::try_from(move3).unwrap();
         assert_eq!(
-            data.into_board()
+            data.into_position()
                 .get_piece_at(Square::try_from(28u8).unwrap().into()),
-            Some(&StandardPiece::WhitePawn.into())
+            Some(&Piece::WhitePawn.into())
         );
         assert_eq!(
-            data.into_board()
+            data.into_position()
                 .get_piece_at(Square::try_from(34u8).unwrap().into()),
-            Some(&StandardPiece::BlackPawn.into())
+            Some(&Piece::BlackPawn.into())
         );
         assert_eq!(
             // check black pawn has properly moved
-            data.into_board()
+            data.into_position()
                 .get_piece_at(Square::try_from(50u8).unwrap().into()),
             None
         );
         assert_eq!(
-            data.into_board()
+            data.into_position()
                 .get_piece_at(Square::try_from(21u8).unwrap().into()),
-            Some(&StandardPiece::WhiteKnight.into())
+            Some(&Piece::WhiteKnight.into())
         );
 
         assert_eq!(data.side_to_move, Color::Black);

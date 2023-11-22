@@ -34,10 +34,10 @@ pub trait Standard: Position<Piece: Piece<Color = Self::Color>> {
     /// for each of the four rooks.
     type CastlingPermissions;
 
-    /// Returns the [`Color`] corresponding to the side next to move.
+    /// Returns the color corresponding to the side next to move.
     fn side_to_move(&self) -> Self::Color;
 
-    /// Returns a [`CastlingPermissions`] denoting whether each of
+    /// Returns a struct describing whether each of
     /// the four rooks is still castleable.
     fn castling_permissions(&self) -> Self::CastlingPermissions;
 
@@ -102,7 +102,7 @@ pub trait Process: Validate {
 mod tests {
     use super::*;
     use crate::standard::{
-        piece::StandardPiece,
+        piece::Piece,
         r#move::{IllegalMoveError, LegalMove, Move},
         Board, Square,
     };
@@ -117,7 +117,7 @@ mod tests {
 
     #[test]
     fn board_is_object_safe() {
-        let _board: Box<dyn super::Position<Index = Square, Piece = StandardPiece>> =
+        let _board: Box<dyn super::Position<Index = Square, Piece = Piece>> =
             Box::new(Board::default());
     }
 
@@ -126,7 +126,7 @@ mod tests {
         let _validate: Box<
             dyn Validate<
                 Index = Square,
-                Piece = StandardPiece,
+                Piece = Piece,
                 Move = Move,
                 LegalMove = LegalMove,
                 ValidationError = IllegalMoveError,
@@ -139,7 +139,7 @@ mod tests {
         let _process: Box<
             dyn Process<
                 Index = Square,
-                Piece = StandardPiece,
+                Piece = Piece,
                 Move = Move,
                 LegalMove = LegalMove,
                 ValidationError = IllegalMoveError,

@@ -6,7 +6,7 @@ use super::{
     Square,
 };
 
-use crate::{core, core::Position, io::fen::Fen, standard::piece::StandardPiece};
+use crate::{core, core::Position, io::fen::Fen, standard::piece::Piece};
 
 /// Represents the possible castling permissions described by a FEN string.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -68,13 +68,13 @@ impl Default for BoardState {
 /// Represents a standard 8x8 chess board.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Board {
-    pieces: [Option<StandardPiece>; 64],
+    pieces: [Option<Piece>; 64],
     state: BoardState,
 }
 
 impl core::Position for Board {
     type Index = Square;
-    type Piece = StandardPiece;
+    type Piece = Piece;
 
     fn get_piece_at(&self, index: Self::Index) -> Option<&Self::Piece> {
         self.pieces[usize::from(index)].as_ref()
@@ -119,22 +119,22 @@ impl Default for Board {
     fn default() -> Self {
         Self {
             pieces: [
-                Some(StandardPiece::WhiteRook),
-                Some(StandardPiece::WhiteKnight),
-                Some(StandardPiece::WhiteBishop),
-                Some(StandardPiece::WhiteQueen),
-                Some(StandardPiece::WhiteKing),
-                Some(StandardPiece::WhiteBishop),
-                Some(StandardPiece::WhiteKnight),
-                Some(StandardPiece::WhiteRook),
-                Some(StandardPiece::WhitePawn),
-                Some(StandardPiece::WhitePawn),
-                Some(StandardPiece::WhitePawn),
-                Some(StandardPiece::WhitePawn),
-                Some(StandardPiece::WhitePawn),
-                Some(StandardPiece::WhitePawn),
-                Some(StandardPiece::WhitePawn),
-                Some(StandardPiece::WhitePawn),
+                Some(Piece::WhiteRook),
+                Some(Piece::WhiteKnight),
+                Some(Piece::WhiteBishop),
+                Some(Piece::WhiteQueen),
+                Some(Piece::WhiteKing),
+                Some(Piece::WhiteBishop),
+                Some(Piece::WhiteKnight),
+                Some(Piece::WhiteRook),
+                Some(Piece::WhitePawn),
+                Some(Piece::WhitePawn),
+                Some(Piece::WhitePawn),
+                Some(Piece::WhitePawn),
+                Some(Piece::WhitePawn),
+                Some(Piece::WhitePawn),
+                Some(Piece::WhitePawn),
+                Some(Piece::WhitePawn),
                 None,
                 None,
                 None,
@@ -167,22 +167,22 @@ impl Default for Board {
                 None,
                 None,
                 None,
-                Some(StandardPiece::BlackPawn),
-                Some(StandardPiece::BlackPawn),
-                Some(StandardPiece::BlackPawn),
-                Some(StandardPiece::BlackPawn),
-                Some(StandardPiece::BlackPawn),
-                Some(StandardPiece::BlackPawn),
-                Some(StandardPiece::BlackPawn),
-                Some(StandardPiece::BlackPawn),
-                Some(StandardPiece::BlackRook),
-                Some(StandardPiece::BlackKnight),
-                Some(StandardPiece::BlackBishop),
-                Some(StandardPiece::BlackQueen),
-                Some(StandardPiece::BlackKing),
-                Some(StandardPiece::BlackBishop),
-                Some(StandardPiece::BlackKnight),
-                Some(StandardPiece::BlackRook),
+                Some(Piece::BlackPawn),
+                Some(Piece::BlackPawn),
+                Some(Piece::BlackPawn),
+                Some(Piece::BlackPawn),
+                Some(Piece::BlackPawn),
+                Some(Piece::BlackPawn),
+                Some(Piece::BlackPawn),
+                Some(Piece::BlackPawn),
+                Some(Piece::BlackRook),
+                Some(Piece::BlackKnight),
+                Some(Piece::BlackBishop),
+                Some(Piece::BlackQueen),
+                Some(Piece::BlackKing),
+                Some(Piece::BlackBishop),
+                Some(Piece::BlackKnight),
+                Some(Piece::BlackRook),
             ],
             state: BoardState::default(),
         }
@@ -190,7 +190,7 @@ impl Default for Board {
 }
 
 impl std::ops::Index<Square> for Board {
-    type Output = Option<StandardPiece>;
+    type Output = Option<Piece>;
 
     fn index(&self, index: Square) -> &Self::Output {
         &self.pieces[<Square as Into<usize>>::into(index)]
@@ -200,10 +200,10 @@ impl std::ops::Index<Square> for Board {
 impl From<Fen> for Board {
     fn from(value: Fen) -> Self {
         let mut pieces = [None; 64];
-        let board = value.into_board();
+        let board = value.into_position();
         for i in 0..=63 {
             let index = unsafe { Square::new_unchecked(i) };
-            let piece: Option<StandardPiece> = board.get_piece_at(index.into()).map(|&p| p.into());
+            let piece: Option<Piece> = board.get_piece_at(index.into()).map(|&p| p.into());
             pieces[i as usize] = piece;
         }
 
@@ -236,7 +236,7 @@ impl<'a> IntoIterator for &'a Board {
 
 impl<'a> Board {
     /// Returns an iterator over the ranks of `self`, from white to black.
-    pub fn rank_iter(&'a self) -> impl Iterator<Item = &'a [Option<StandardPiece>]> {
+    pub fn rank_iter(&'a self) -> impl Iterator<Item = &'a [Option<Piece>]> {
         BoardRankIterator::from(self)
     }
 }
@@ -267,12 +267,12 @@ impl<'a> ExactSizeIterator for BoardIterator<'a> {
 }
 
 struct BoardRankIterator<'a> {
-    chunk_iter: ChunksExact<'a, Option<StandardPiece>>,
+    chunk_iter: ChunksExact<'a, Option<Piece>>,
     index: usize,
 }
 
 impl<'a> Iterator for BoardRankIterator<'a> {
-    type Item = &'a [Option<StandardPiece>];
+    type Item = &'a [Option<Piece>];
 
     fn next(&mut self) -> Option<Self::Item> {
         let result = self.chunk_iter.next();
@@ -312,24 +312,24 @@ mod tests {
         let mut board_iter = board.into_iter();
 
         // first rank
-        assert_eq!(board_iter.next(), Some(Some(StandardPiece::WhiteRook)));
-        assert_eq!(board_iter.next(), Some(Some(StandardPiece::WhiteKnight)));
-        assert_eq!(board_iter.next(), Some(Some(StandardPiece::WhiteBishop)));
-        assert_eq!(board_iter.next(), Some(Some(StandardPiece::WhiteQueen)));
-        assert_eq!(board_iter.next(), Some(Some(StandardPiece::WhiteKing)));
-        assert_eq!(board_iter.next(), Some(Some(StandardPiece::WhiteBishop)));
-        assert_eq!(board_iter.next(), Some(Some(StandardPiece::WhiteKnight)));
-        assert_eq!(board_iter.next(), Some(Some(StandardPiece::WhiteRook)));
+        assert_eq!(board_iter.next(), Some(Some(Piece::WhiteRook)));
+        assert_eq!(board_iter.next(), Some(Some(Piece::WhiteKnight)));
+        assert_eq!(board_iter.next(), Some(Some(Piece::WhiteBishop)));
+        assert_eq!(board_iter.next(), Some(Some(Piece::WhiteQueen)));
+        assert_eq!(board_iter.next(), Some(Some(Piece::WhiteKing)));
+        assert_eq!(board_iter.next(), Some(Some(Piece::WhiteBishop)));
+        assert_eq!(board_iter.next(), Some(Some(Piece::WhiteKnight)));
+        assert_eq!(board_iter.next(), Some(Some(Piece::WhiteRook)));
 
         // second rank
-        assert_eq!(board_iter.next(), Some(Some(StandardPiece::WhitePawn)));
-        assert_eq!(board_iter.next(), Some(Some(StandardPiece::WhitePawn)));
-        assert_eq!(board_iter.next(), Some(Some(StandardPiece::WhitePawn)));
-        assert_eq!(board_iter.next(), Some(Some(StandardPiece::WhitePawn)));
-        assert_eq!(board_iter.next(), Some(Some(StandardPiece::WhitePawn)));
-        assert_eq!(board_iter.next(), Some(Some(StandardPiece::WhitePawn)));
-        assert_eq!(board_iter.next(), Some(Some(StandardPiece::WhitePawn)));
-        assert_eq!(board_iter.next(), Some(Some(StandardPiece::WhitePawn)));
+        assert_eq!(board_iter.next(), Some(Some(Piece::WhitePawn)));
+        assert_eq!(board_iter.next(), Some(Some(Piece::WhitePawn)));
+        assert_eq!(board_iter.next(), Some(Some(Piece::WhitePawn)));
+        assert_eq!(board_iter.next(), Some(Some(Piece::WhitePawn)));
+        assert_eq!(board_iter.next(), Some(Some(Piece::WhitePawn)));
+        assert_eq!(board_iter.next(), Some(Some(Piece::WhitePawn)));
+        assert_eq!(board_iter.next(), Some(Some(Piece::WhitePawn)));
+        assert_eq!(board_iter.next(), Some(Some(Piece::WhitePawn)));
 
         // third rank
         assert_eq!(board_iter.next(), Some(None));
@@ -372,24 +372,24 @@ mod tests {
         assert_eq!(board_iter.next(), Some(None));
 
         // seventh rank
-        assert_eq!(board_iter.next(), Some(Some(StandardPiece::BlackPawn)));
-        assert_eq!(board_iter.next(), Some(Some(StandardPiece::BlackPawn)));
-        assert_eq!(board_iter.next(), Some(Some(StandardPiece::BlackPawn)));
-        assert_eq!(board_iter.next(), Some(Some(StandardPiece::BlackPawn)));
-        assert_eq!(board_iter.next(), Some(Some(StandardPiece::BlackPawn)));
-        assert_eq!(board_iter.next(), Some(Some(StandardPiece::BlackPawn)));
-        assert_eq!(board_iter.next(), Some(Some(StandardPiece::BlackPawn)));
-        assert_eq!(board_iter.next(), Some(Some(StandardPiece::BlackPawn)));
+        assert_eq!(board_iter.next(), Some(Some(Piece::BlackPawn)));
+        assert_eq!(board_iter.next(), Some(Some(Piece::BlackPawn)));
+        assert_eq!(board_iter.next(), Some(Some(Piece::BlackPawn)));
+        assert_eq!(board_iter.next(), Some(Some(Piece::BlackPawn)));
+        assert_eq!(board_iter.next(), Some(Some(Piece::BlackPawn)));
+        assert_eq!(board_iter.next(), Some(Some(Piece::BlackPawn)));
+        assert_eq!(board_iter.next(), Some(Some(Piece::BlackPawn)));
+        assert_eq!(board_iter.next(), Some(Some(Piece::BlackPawn)));
 
         // eighth rank
-        assert_eq!(board_iter.next(), Some(Some(StandardPiece::BlackRook)));
-        assert_eq!(board_iter.next(), Some(Some(StandardPiece::BlackKnight)));
-        assert_eq!(board_iter.next(), Some(Some(StandardPiece::BlackBishop)));
-        assert_eq!(board_iter.next(), Some(Some(StandardPiece::BlackQueen)));
-        assert_eq!(board_iter.next(), Some(Some(StandardPiece::BlackKing)));
-        assert_eq!(board_iter.next(), Some(Some(StandardPiece::BlackBishop)));
-        assert_eq!(board_iter.next(), Some(Some(StandardPiece::BlackKnight)));
-        assert_eq!(board_iter.next(), Some(Some(StandardPiece::BlackRook)));
+        assert_eq!(board_iter.next(), Some(Some(Piece::BlackRook)));
+        assert_eq!(board_iter.next(), Some(Some(Piece::BlackKnight)));
+        assert_eq!(board_iter.next(), Some(Some(Piece::BlackBishop)));
+        assert_eq!(board_iter.next(), Some(Some(Piece::BlackQueen)));
+        assert_eq!(board_iter.next(), Some(Some(Piece::BlackKing)));
+        assert_eq!(board_iter.next(), Some(Some(Piece::BlackBishop)));
+        assert_eq!(board_iter.next(), Some(Some(Piece::BlackKnight)));
+        assert_eq!(board_iter.next(), Some(Some(Piece::BlackRook)));
 
         // end of iterator
         assert_eq!(board_iter.next(), None);
@@ -402,8 +402,8 @@ mod tests {
         let j = Square::try_from(63u8).unwrap();
         let k = Square::try_from(33u8).unwrap();
 
-        assert_eq!(board[i], Some(StandardPiece::WhiteRook));
-        assert_eq!(board[j], Some(StandardPiece::BlackRook));
+        assert_eq!(board[i], Some(Piece::WhiteRook));
+        assert_eq!(board[j], Some(Piece::BlackRook));
         assert_eq!(board[k], None);
     }
 }

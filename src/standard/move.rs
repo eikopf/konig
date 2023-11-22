@@ -3,16 +3,16 @@ use crate::core;
 use crate::core::r#move;
 use thiserror::Error;
 
-/// Results when a [`StandardMove`] cannot be converted into a [`LegalStandardMove`]
+/// Results when a [`Move`] cannot be converted into a [`LegalMove`]
 #[derive(Debug, Error)]
 pub enum IllegalMoveError {
-    /// Results when a [`StandardMove`] is illegal because the friendly king is in check.
+    /// Results when a [`Move`] is illegal because the friendly king is in check.
     #[error("Invalid move {0:?}: the friendly king is in check.")]
     Check(Move),
-    /// Results when a [`StandardMove`] is illegal because it has an invalid source index.
+    /// Results when a [`Move`] is illegal because it has an invalid source index.
     #[error("Invalid move source: {0:?}")]
     InvalidSource(Square),
-    /// Results when a [`StandardMove`] is illegal because it has an invalid target index.
+    /// Results when a [`Move`] is illegal because it has an invalid target index.
     #[error("Invalid move target: {0:?}")]
     InvalidTarget(Square),
 }
@@ -24,7 +24,7 @@ impl r#move::IllegalMoveError for IllegalMoveError {
     type LegalMove = LegalMove;
 }
 
-/// Represents a possible move on a `StandardBoard`,
+/// Represents a possible move on a [`Board`],
 /// including illegal moves.
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub struct Move {
@@ -34,7 +34,7 @@ pub struct Move {
     target: Square,
 }
 
-/// Represents a legal move on a `StandardBoard`.
+/// Represents a legal move on a [`Board`].
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub struct LegalMove(Move);
 

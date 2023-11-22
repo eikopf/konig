@@ -21,7 +21,7 @@ use nom::{
 };
 use thiserror::Error;
 
-use crate::standard::piece::StandardPieceKind;
+use crate::standard::piece::PieceKind;
 
 /// The error returned when attempting to
 /// parse an invalid SAN literal.
@@ -147,7 +147,7 @@ enum CastleMove {
 /// we also include the optional check, checkmate, and annotation suffixes.
 #[derive(Debug, Eq, PartialEq, Clone)]
 struct NormalMove {
-    piece: StandardPieceKind,
+    piece: PieceKind,
     disambiguation_field: Option<DisambiguationField>,
     target: (char, char),
     is_capture: bool,
@@ -164,7 +164,7 @@ struct PawnMove {
     target: (char, char),
     is_capture: bool,
     capture_rank: Option<char>,
-    promotion_piece: Option<StandardPieceKind>,
+    promotion_piece: Option<PieceKind>,
 }
 
 /// Represents a SAN literal denoting an abbreviated pawn move.
@@ -178,7 +178,7 @@ struct AbbreviatedPawnMove {
     source_rank: char,
     target_rank: char,
     is_capture: bool,
-    promotion_piece: Option<StandardPieceKind>,
+    promotion_piece: Option<PieceKind>,
 }
 
 /// Describes the optional field
@@ -247,16 +247,16 @@ fn checkmate(source: &str) -> SanResult<bool> {
 }
 
 /// Parses a piece of the form [KQBNR].
-fn piece(source: &str) -> SanResult<StandardPieceKind> {
+fn piece(source: &str) -> SanResult<PieceKind> {
     one_of("KQBNR").parse(source).map(|(tail, piece)| {
         (
             tail,
             match piece {
-                'K' => StandardPieceKind::King,
-                'Q' => StandardPieceKind::Queen,
-                'B' => StandardPieceKind::Bishop,
-                'N' => StandardPieceKind::Knight,
-                'R' => StandardPieceKind::Rook,
+                'K' => PieceKind::King,
+                'Q' => PieceKind::Queen,
+                'B' => PieceKind::Bishop,
+                'N' => PieceKind::Knight,
+                'R' => PieceKind::Rook,
                 _ => unreachable!(),
             },
         )
@@ -297,17 +297,17 @@ fn capture(source: &str) -> SanResult<char> {
 }
 
 /// Parses the "=[RNBQ]" segment that can appear at the end of a pawn move.
-fn promotion(source: &str) -> SanResult<StandardPieceKind> {
+fn promotion(source: &str) -> SanResult<PieceKind> {
     let promotion_piece = one_of("RNBQ");
     let mut promotion = preceded(tag("="), cut(promotion_piece));
     promotion.parse(source).map(|(tail, piece)| {
         (
             tail,
             match piece {
-                'R' => StandardPieceKind::Rook,
-                'N' => StandardPieceKind::Knight,
-                'B' => StandardPieceKind::Bishop,
-                'Q' => StandardPieceKind::Queen,
+                'R' => PieceKind::Rook,
+                'N' => PieceKind::Knight,
+                'B' => PieceKind::Bishop,
+                'Q' => PieceKind::Queen,
                 _ => unreachable!(),
             },
         )
@@ -316,12 +316,13 @@ fn promotion(source: &str) -> SanResult<StandardPieceKind> {
 
 /// Parses a move of the form \[abcdefgh\]\[capture\]?\[abcefgh\]\[promotion\]?.
 fn abbreviated_pawn_move(source: &str) -> SanResult<SanData> {
-    let mut abbrev_move = tuple((
-        one_of("abcdefgh"),
-        opt(capture),
-        one_of("abcdefgh"),
-        opt(promotion),
-    ));
+    let mut abbrev_move =
+        tuple((
+            one_of("abcdefgh"),
+            opt(capture),
+            one_of("abcdefgh"),
+            opt(promotion),
+        ));
     abbrev_move
         .parse(source)
         .map(|(tail, (source, capture, target, promotion))| {
@@ -374,12 +375,13 @@ fn castle_move(source: &str) -> SanResult<SanData> {
 
 /// Parses a normal (non-pawn) move with the form [piece][disambiguation_field]?[capture]?[target].
 fn normal_move(source: &str) -> SanResult<SanData> {
-    let unambiguous_normal_move = tuple((
-        piece,
-        success::<&str, Option<_>, _>(None),
-        opt(capture),
-        target,
-    ));
+    let unambiguous_normal_move =
+        tuple((
+            piece,
+            success::<&str, Option<_>, _>(None),
+            opt(capture),
+            target,
+        ));
 
     let normal_move = tuple((piece, disambiguation_field, opt(capture), target));
     alt((normal_move, unambiguous_normal_move))
@@ -399,12 +401,13 @@ fn normal_move(source: &str) -> SanResult<SanData> {
 
 /// Parses a complete SAN literal.
 fn san_literal(source: &str) -> SanResult<San> {
-    let san_literal = tuple((
-        alt((castle_move, pawn_move, abbreviated_pawn_move, normal_move)),
-        opt(permutation((opt(check), opt(checkmate)))),
-        annotation,
-        rest,
-    ));
+    let san_literal =
+        tuple((
+            alt((castle_move, pawn_move, abbreviated_pawn_move, normal_move)),
+            opt(permutation((opt(check), opt(checkmate)))),
+            annotation,
+            rest,
+        ));
 
     let mut san_parser = complete(san_literal);
     let (tail, (data, check_state, annotation, rest)) = san_parser.parse(source)?;

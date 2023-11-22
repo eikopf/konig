@@ -1,8 +1,8 @@
-use crate::core::piece::Piece;
+use crate::core;
 
 /// Represents the standard set of chess pieces.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub enum StandardPiece {
+pub enum Piece {
     /// A black pawn.
     BlackPawn,
     /// A black rook.
@@ -40,7 +40,7 @@ pub enum Color {
 
 /// Represents the standard set of chess piece kinds.
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
-pub enum StandardPieceKind {
+pub enum PieceKind {
     /// A pawn.
     Pawn,
     /// A rook.
@@ -55,9 +55,9 @@ pub enum StandardPieceKind {
     King,
 }
 
-impl Piece for StandardPiece {
+impl core::Piece for Piece {
     type Color = Color;
-    type Kind = StandardPieceKind;
+    type Kind = PieceKind;
 
     fn color(&self) -> Self::Color {
         match self {
@@ -78,62 +78,62 @@ impl Piece for StandardPiece {
 
     fn kind(&self) -> Self::Kind {
         match self {
-            Self::BlackPawn => StandardPieceKind::Pawn,
-            Self::BlackRook => StandardPieceKind::Rook,
-            Self::BlackKnight => StandardPieceKind::Knight,
-            Self::BlackBishop => StandardPieceKind::Bishop,
-            Self::BlackQueen => StandardPieceKind::Queen,
-            Self::BlackKing => StandardPieceKind::King,
-            Self::WhitePawn => StandardPieceKind::Pawn,
-            Self::WhiteRook => StandardPieceKind::Rook,
-            Self::WhiteKnight => StandardPieceKind::Knight,
-            Self::WhiteBishop => StandardPieceKind::Bishop,
-            Self::WhiteQueen => StandardPieceKind::Queen,
-            Self::WhiteKing => StandardPieceKind::King,
+            Self::BlackPawn => PieceKind::Pawn,
+            Self::BlackRook => PieceKind::Rook,
+            Self::BlackKnight => PieceKind::Knight,
+            Self::BlackBishop => PieceKind::Bishop,
+            Self::BlackQueen => PieceKind::Queen,
+            Self::BlackKing => PieceKind::King,
+            Self::WhitePawn => PieceKind::Pawn,
+            Self::WhiteRook => PieceKind::Rook,
+            Self::WhiteKnight => PieceKind::Knight,
+            Self::WhiteBishop => PieceKind::Bishop,
+            Self::WhiteQueen => PieceKind::Queen,
+            Self::WhiteKing => PieceKind::King,
         }
     }
 
     fn new(color: Self::Color, kind: Self::Kind) -> Self {
         match (color, kind) {
-            (Color::Black, StandardPieceKind::Pawn) => Self::BlackPawn,
-            (Color::Black, StandardPieceKind::Rook) => Self::BlackRook,
-            (Color::Black, StandardPieceKind::Knight) => Self::BlackKnight,
-            (Color::Black, StandardPieceKind::Bishop) => Self::BlackBishop,
-            (Color::Black, StandardPieceKind::Queen) => Self::BlackQueen,
-            (Color::Black, StandardPieceKind::King) => Self::BlackKing,
-            (Color::White, StandardPieceKind::Pawn) => Self::WhitePawn,
-            (Color::White, StandardPieceKind::Rook) => Self::WhiteRook,
-            (Color::White, StandardPieceKind::Knight) => Self::WhiteKnight,
-            (Color::White, StandardPieceKind::Bishop) => Self::WhiteBishop,
-            (Color::White, StandardPieceKind::Queen) => Self::WhiteQueen,
-            (Color::White, StandardPieceKind::King) => Self::WhiteKing,
+            (Color::Black, PieceKind::Pawn) => Self::BlackPawn,
+            (Color::Black, PieceKind::Rook) => Self::BlackRook,
+            (Color::Black, PieceKind::Knight) => Self::BlackKnight,
+            (Color::Black, PieceKind::Bishop) => Self::BlackBishop,
+            (Color::Black, PieceKind::Queen) => Self::BlackQueen,
+            (Color::Black, PieceKind::King) => Self::BlackKing,
+            (Color::White, PieceKind::Pawn) => Self::WhitePawn,
+            (Color::White, PieceKind::Rook) => Self::WhiteRook,
+            (Color::White, PieceKind::Knight) => Self::WhiteKnight,
+            (Color::White, PieceKind::Bishop) => Self::WhiteBishop,
+            (Color::White, PieceKind::Queen) => Self::WhiteQueen,
+            (Color::White, PieceKind::King) => Self::WhiteKing,
         }
     }
 }
 
-impl TryFrom<char> for StandardPiece {
+impl TryFrom<char> for Piece {
     type Error = (); // there's basically only one reason for this conversion to fail
 
     fn try_from(value: char) -> Result<Self, Self::Error> {
         match value {
-            'p' => Ok(StandardPiece::BlackPawn),
-            'r' => Ok(StandardPiece::BlackRook),
-            'n' => Ok(StandardPiece::BlackKnight),
-            'b' => Ok(StandardPiece::BlackBishop),
-            'q' => Ok(StandardPiece::BlackQueen),
-            'k' => Ok(StandardPiece::BlackKing),
-            'P' => Ok(StandardPiece::WhitePawn),
-            'R' => Ok(StandardPiece::WhiteRook),
-            'N' => Ok(StandardPiece::WhiteKnight),
-            'B' => Ok(StandardPiece::WhiteBishop),
-            'Q' => Ok(StandardPiece::WhiteQueen),
-            'K' => Ok(StandardPiece::WhiteKing),
+            'p' => Ok(Piece::BlackPawn),
+            'r' => Ok(Piece::BlackRook),
+            'n' => Ok(Piece::BlackKnight),
+            'b' => Ok(Piece::BlackBishop),
+            'q' => Ok(Piece::BlackQueen),
+            'k' => Ok(Piece::BlackKing),
+            'P' => Ok(Piece::WhitePawn),
+            'R' => Ok(Piece::WhiteRook),
+            'N' => Ok(Piece::WhiteKnight),
+            'B' => Ok(Piece::WhiteBishop),
+            'Q' => Ok(Piece::WhiteQueen),
+            'K' => Ok(Piece::WhiteKing),
             _ => Err(()),
         }
     }
 }
 
-impl Into<char> for StandardPiece {
+impl Into<char> for Piece {
     fn into(self) -> char {
         match self {
             Self::BlackPawn => 'p',
@@ -152,7 +152,7 @@ impl Into<char> for StandardPiece {
     }
 }
 
-impl StandardPiece {
+impl Piece {
     /// Converts `self` into the corresponding UTF-8 [`char`].
     pub fn into_utf8_chess_symbol(self) -> char {
         match self {
