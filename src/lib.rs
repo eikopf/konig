@@ -4,6 +4,8 @@
 // lints
 #![warn(missing_docs)]
 // features
+#![feature(associated_type_bounds)]
+#![feature(impl_trait_in_assoc_type)]
 #![feature(slice_flatten)]
 
 pub mod core;

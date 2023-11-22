@@ -1,4 +1,7 @@
 use crate::core::index::{Index, IndexError};
+use nom::{
+    character::complete::one_of, combinator::eof, error::VerboseError, sequence::Tuple, Finish,
+};
 use nonmax::NonMaxU8;
 
 /// Represents a specific square on a `StandardBoard`
@@ -49,15 +52,30 @@ impl<'a> TryFrom<&'a str> for StandardIndex {
     type Error = IndexError<&'a str>;
 
     fn try_from(value: &'a str) -> Result<Self, Self::Error> {
-        // TODO: complete function
-        todo!()
+        let mut parser = (
+            one_of("abcdefgh"), // file
+            one_of("12345678"), // rank
+            eof,
+        );
+
+        parser
+            .parse(value)
+            .finish()
+            .map(|(_, (file, rank, _))| {
+                let rank_offset = ((rank as u8) - 49) * 8;
+                let file_offset = (file as u8) - 97;
+                unsafe { StandardIndex::new_unchecked(rank_offset + file_offset) }
+            })
+            .map_err(|_: nom::error::Error<&'a str>| IndexError::InvalidFormat(value))
     }
 }
 
-impl<'a> Into<&'a str> for StandardIndex {
-    fn into(self) -> &'a str {
-        // TODO: complete function
-        todo!()
+impl Into<String> for StandardIndex {
+    fn into(self) -> String {
+        let rank = ((self.0.get() / 8) + 49) as char;
+        let file = ((self.0.get() % 8) + 97) as char;
+
+        [file, rank].iter().collect()
     }
 }
 
@@ -70,7 +88,7 @@ impl StandardIndex {
     ///
     /// This should be treated as a utility function,
     /// to avoid constantly writing `StandardIndex::try_from(val).unwrap()`.
-    pub fn new(value: u8) -> Self {
+    pub(crate) fn new(value: u8) -> Self {
         assert!(value <= 63);
         unsafe { Self(NonMaxU8::new_unchecked(value)) }
     }
@@ -109,5 +127,25 @@ mod tests {
         assert!(k.is_err_and(|err| err == IndexError::OutOfBounds(64usize)));
     }
 
-    // TODO: write tests for algebraic index conversions
+    #[test]
+    fn standard_index_try_from_string_slice_is_correct() {
+        let i = StandardIndex::try_from("a3").unwrap();
+        let j = StandardIndex::try_from("d6").unwrap();
+        let k = StandardIndex::try_from("h7").unwrap();
+
+        assert_eq!(i, StandardIndex::new(16));
+        assert_eq!(j, StandardIndex::new(43));
+        assert_eq!(k, StandardIndex::new(55));
+    }
+
+    #[test]
+    fn standard_index_into_string_is_correct() {
+        let a3: String = StandardIndex::new(16).into();
+        let d6: String = StandardIndex::new(43).into();
+        let h7: String = StandardIndex::new(55).into();
+
+        assert_eq!(a3, String::from("a3"));
+        assert_eq!(d6, String::from("d6"));
+        assert_eq!(h7, String::from("h7"));
+    }
 }

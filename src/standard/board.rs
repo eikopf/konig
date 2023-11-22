@@ -2,6 +2,7 @@ use std::slice::ChunksExact;
 
 use super::{
     index::StandardIndex,
+    piece::StandardColor,
     r#move::{IllegalStandardMoveError, LegalStandardMove, StandardMove},
 };
 
@@ -53,7 +54,7 @@ impl Default for StandardCastlingPermissions {
 /// state of the pieces on the board.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct StandardBoardState {
-    white_turn: bool,
+    side_to_move: StandardColor,
     castling_rights: StandardCastlingPermissions,
     en_passant_square: Option<StandardIndex>,
 }
@@ -61,7 +62,7 @@ struct StandardBoardState {
 impl Default for StandardBoardState {
     fn default() -> Self {
         Self {
-            white_turn: true,
+            side_to_move: StandardColor::White,
             castling_rights: StandardCastlingPermissions::default(),
             en_passant_square: None,
         }
@@ -193,12 +194,12 @@ impl From<Fen> for StandardBoard {
         }
 
         let state = StandardBoardState {
-            white_turn: value.white_to_move(),
+            side_to_move: value.side_to_move(),
             castling_rights: StandardCastlingPermissions {
-                white_king_side: value.castling_permissions().0,
-                white_queen_side: value.castling_permissions().1,
-                black_king_side: value.castling_permissions().2,
-                black_queen_side: value.castling_permissions().3,
+                white_king_side: value.castling_permissions().white_king_side,
+                white_queen_side: value.castling_permissions().white_queen_side,
+                black_king_side: value.castling_permissions().black_king_side,
+                black_queen_side: value.castling_permissions().black_queen_side,
             },
             en_passant_square: value.en_passant_square().map(Into::into),
         };
@@ -209,10 +210,10 @@ impl From<Fen> for StandardBoard {
 
 impl<'a> IntoIterator for &'a StandardBoard {
     type Item = Option<<StandardBoard as Board>::Piece>;
-    type IntoIter = StandardBoardIterator<'a>;
+    type IntoIter = impl Iterator<Item = Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
-        Self::IntoIter {
+        StandardBoardIterator {
             board: &self,
             index: 0,
         }
@@ -221,13 +222,20 @@ impl<'a> IntoIterator for &'a StandardBoard {
 
 impl<'a> StandardBoard {
     /// Returns an iterator over the ranks of `self`, from white to black.
-    pub fn rank_iter(&'a self) -> StandardBoardRankIterator<'a> {
+    pub fn rank_iter(&'a self) -> impl Iterator<Item = &'a [Option<StandardPiece>]> {
         StandardBoardRankIterator::from(self)
     }
 }
 
+impl StandardBoard {
+    /// Returns the side whose move is next as a [`StandardColor`].
+    pub fn side_to_move(&self) -> StandardColor {
+        self.state.side_to_move
+    }
+}
+
 /// Linear iterator over the pieces on a `StandardBoard`.
-pub struct StandardBoardIterator<'a> {
+struct StandardBoardIterator<'a> {
     board: &'a StandardBoard,
     index: usize, // alignment makes u8 and usize take the same space
 }
@@ -253,7 +261,7 @@ impl<'a> ExactSizeIterator for StandardBoardIterator<'a> {
 }
 
 /// Linear iterator over the ranks on a `StandardBoard`.
-pub struct StandardBoardRankIterator<'a> {
+struct StandardBoardRankIterator<'a> {
     chunk_iter: ChunksExact<'a, Option<StandardPiece>>,
     index: usize,
 }

@@ -30,7 +30,7 @@ pub enum StandardPiece {
 }
 
 /// Represents the standard set of chess piece colors.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub enum StandardColor {
     /// The second-playing side.
     Black,
@@ -39,7 +39,7 @@ pub enum StandardColor {
 }
 
 /// Represents the standard set of chess piece kinds.
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub enum StandardPieceKind {
     /// A pawn.
     Pawn,

@@ -1,4 +1,4 @@
-use crate::core::board::Board;
+use crate::core::board::{Board, Standard};
 use crate::core::index::Index;
 use crate::core::piece::Piece;
 use crate::standard::board::{StandardBoard, StandardCastlingPermissions};
@@ -7,9 +7,9 @@ use crate::standard::piece::{StandardColor, StandardPiece};
 
 use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::character::complete::{char, one_of, space0, space1, u16, u8};
-use nom::combinator::{eof, opt, success, verify};
-use nom::error::{ErrorKind, ParseError as NomParseError, VerboseError};
+use nom::character::complete::{char, one_of, space1, u16, u8};
+use nom::combinator::{eof, success, verify};
+use nom::error::VerboseError;
 use nom::multi::{many_m_n, separated_list1};
 use nom::sequence::{pair, Tuple};
 use nom::{Finish, IResult, Parser};
@@ -87,7 +87,7 @@ type PieceArray = [Option<StandardPiece>; 64];
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Fen {
     pieces: PieceArray,
-    white_to_move: bool,
+    side_to_move: StandardColor,
     castling_permissions: StandardCastlingPermissions,
     en_passant_square: Option<StandardIndex>,
     halfmove_clock: u8,
@@ -113,15 +113,17 @@ impl<'a> TryFrom<&'a str> for Fen {
 }
 
 impl Fen {
-    /// Consumes `self` and returns the piece placement component of the FEN string
-    /// as a [`Board`].
+    /// Consumes `self` and returns a [`Standard`].
     pub fn into_board(
         self,
-    ) -> impl Board<
-        Piece = impl Piece + Into<StandardPiece> + From<StandardPiece> + std::fmt::Debug + Eq + Copy,
-        Index = impl Index<MetricTarget = u8> + Into<StandardIndex> + From<StandardIndex>,
-    > + std::ops::Index<StandardIndex, Output = Option<StandardPiece>>
-           + std::fmt::Debug {
+    ) -> impl std::ops::Index<StandardIndex, Output = Option<StandardPiece>>
+           + std::fmt::Debug
+           + Standard<
+        Color = StandardColor,
+        CastlingPermissions = StandardCastlingPermissions,
+        Index = StandardIndex,
+        Piece = StandardPiece,
+    > {
         FenBoard::from(self)
     }
 
@@ -135,31 +137,18 @@ impl Fen {
         self.into()
     }
 
-    /// Returns `true` if it is white's turn to move, and `false` if it is black's.
-    pub fn white_to_move(&self) -> bool {
-        self.white_to_move
+    /// Returns a [`StandardColor`] corresponding the side whose turn it is to move.
+    pub fn side_to_move(&self) -> StandardColor {
+        self.side_to_move
     }
 
-    // TODO: should this be a unique type?
-    /// Returns the castling permissions as they appear in a FEN string.
-    ///
-    /// # Examples
-    /// - `KQkq` => `(true, true, true, true)`;
-    /// - `Kkq`  => `(true, false, true, true)`;
-    /// - `Qq`   => `(false, true, false, true)`;
-    /// - `-`    => `(false, false, false, false)`;
-    pub fn castling_permissions(&self) -> (bool, bool, bool, bool) {
-        let perms = self.castling_permissions;
-        (
-            perms.white_king_side,
-            perms.white_queen_side,
-            perms.black_king_side,
-            perms.black_queen_side,
-        )
+    /// Returns the castling permissions described by this FEN string.
+    pub fn castling_permissions(&self) -> StandardCastlingPermissions {
+        self.castling_permissions
     }
 
     /// Returns the index of the en passant target square, if it exists.
-    pub fn en_passant_square(&self) -> Option<impl Index<MetricTarget = u8> + Into<StandardIndex>> {
+    pub fn en_passant_square(&self) -> Option<StandardIndex> {
         self.en_passant_square
     }
 
@@ -188,6 +177,24 @@ impl Board for FenBoard {
 
     fn get_piece_at(&self, index: Self::Index) -> Option<&Self::Piece> {
         self.data.pieces[usize::from(index)].as_ref()
+    }
+}
+
+impl Standard for FenBoard {
+    type Color = StandardColor;
+
+    type CastlingPermissions = StandardCastlingPermissions;
+
+    fn side_to_move(&self) -> Self::Color {
+        self.data.side_to_move
+    }
+
+    fn castling_permissions(&self) -> Self::CastlingPermissions {
+        self.data.castling_permissions
+    }
+
+    fn en_passant_target_square(&self) -> Option<Self::Index> {
+        self.data.en_passant_square
     }
 }
 
@@ -232,12 +239,21 @@ fn piece(source: &str) -> FenResult<char> {
 fn rank<'a>(source: &'a str) -> FenResult<[Option<StandardPiece>; 8]> {
     let mut pieces = [None; 8];
     let mut index: usize = 0; // write-index into pieces
-    let mut rank = many_m_n(1, 8, alt((digit18, piece)));
-
-    let new_err = |input: &'a str, kind: ErrorKind| {
-        let err = VerboseError::from_error_kind(input, kind);
-        Err(nom::Err::Failure(err))
-    };
+    let mut rank = verify(
+        many_m_n(1, 8, alt((digit18, piece))),
+        // this verify call checks that rank will have exactly 8 values
+        |chars: &Vec<char>| {
+            chars
+                .iter()
+                .map(|&c| match c {
+                    digit @ '1'..='8' => (digit as u8) - 48,
+                    _ => 1,
+                })
+                .reduce(|acc, elem| acc + elem)
+                .unwrap()
+                == 8
+        },
+    );
 
     let (tail, rank) = rank.parse(source)?;
     for character in rank {
@@ -246,14 +262,10 @@ fn rank<'a>(source: &'a str) -> FenResult<[Option<StandardPiece>; 8]> {
                 let length = ((space as u8) - 48) as usize;
                 let initial_index = index;
                 while index < initial_index + length {
-                    if index >= 8 {
-                        return new_err(tail, ErrorKind::TooLarge);
-                    };
                     pieces[index] = None;
                     index += 1;
                 }
             }
-
             piece @ _ => {
                 pieces[index] = match piece {
                     'p' => Some(StandardPiece::BlackPawn),
@@ -511,7 +523,7 @@ fn fen_literal(source: &str) -> FenResult<Fen> {
         _tail,
         Fen {
             pieces,
-            white_to_move: side_to_move == StandardColor::White,
+            side_to_move,
             castling_permissions,
             en_passant_square,
             halfmove_clock,
@@ -541,7 +553,7 @@ mod tests {
             )
         }
 
-        assert_eq!(data.white_to_move, true);
+        assert_eq!(data.side_to_move, StandardColor::White);
         assert_eq!(
             data.castling_permissions,
             StandardCastlingPermissions::default()
@@ -571,7 +583,7 @@ mod tests {
             )
         }
 
-        assert_eq!(data.white_to_move, true);
+        assert_eq!(data.side_to_move, StandardColor::White);
         assert_eq!(
             data.castling_permissions,
             StandardCastlingPermissions::default()
@@ -589,7 +601,7 @@ mod tests {
                 .get_piece_at(StandardIndex::try_from(28u8).unwrap().into()),
             Some(&StandardPiece::WhitePawn.into())
         );
-        assert_eq!(data.white_to_move, false);
+        assert_eq!(data.side_to_move, StandardColor::Black);
         assert_eq!(
             data.castling_permissions,
             StandardCastlingPermissions::default()
@@ -621,7 +633,7 @@ mod tests {
             None
         );
 
-        assert_eq!(data.white_to_move, true);
+        assert_eq!(data.side_to_move, StandardColor::White);
         assert_eq!(
             data.castling_permissions,
             StandardCastlingPermissions::default()
@@ -658,7 +670,7 @@ mod tests {
             Some(&StandardPiece::WhiteKnight.into())
         );
 
-        assert_eq!(data.white_to_move, false);
+        assert_eq!(data.side_to_move, StandardColor::Black);
         assert_eq!(
             data.castling_permissions,
             StandardCastlingPermissions::default()
@@ -674,7 +686,7 @@ mod tests {
     // use the command `curl $FEN_JSON | jq ".[] | .fen" | sed "s/\$/,/g"` to
     // get the fen strings correctly formatted.
     #[test]
-    fn check_fen_parser_on_misc_moves() {
+    fn check_fen_parser_on_misc_positions() {
         let fen_strings = vec![
             "r6r/1b2k1bq/8/8/7B/8/8/R3K2R b KQ - 3 2",
             "8/8/8/2k5/2pP4/8/B7/4K3 b - d3 0 3",
@@ -706,7 +718,7 @@ mod tests {
             println!(
                 "parsed {}; got this:\nwhite_to_move: {:?}, ep square: {:?}\nhalfmove clock: {}, fullmove counter: {}\ncastling perms: {:?}\nboard:\n8: {:?}\n7: {:?}\n6: {:?}\n5: {:?}\n4: {:?}\n3: {:?}\n2: {:?}\n1: {:?}\n",
                 string,
-                fen.white_to_move,
+                fen.side_to_move,
                 fen.en_passant_square,
                 fen.halfmove_clock,
                 fen.fullmove_counter,
@@ -720,6 +732,39 @@ mod tests {
                 &fen.pieces[8..16],
                 &fen.pieces[0..8],
             )
+        }
+    }
+
+    #[test]
+    fn check_fen_parser_rejects_bad_positions() {
+        let fen_strings = vec![
+            "r6r/1b2k1bq/8/8/7B/8/8/R3K2R b KQ 3 2",
+            "8/8/8/2k5/2pP4/8/B7/4K3 b - d3 0",
+            "r1bqkbnr/pppppppp/n7/8/8/P7/1PPPPPPPRNBQKBNR KQkq - 2 2",
+            "r3k2r/p1pp1pb1/bn2Qnp1/2qP1N3/1p2P3/25/PPPBBPPP/R3K2R b KQkq",
+            "2kr3rp1ppqb1/n2Qnp1/3PN3/1p2P3/2N5/PPPBBPPP/R3K2R b KQ - 3 2",
+            "rnb2k1r/pp1Pbppp/2p5/q7/2B5/8/PPPQNnPP KQ - 3 9",
+            "2r5/3pk3/8/2P5/8/2K5/8/8",
+            "rnbq1k1r/pp1Pbppp/2p5/8B5/8/PPP1NnPP/RNBQK2R w - 1 8",
+            "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/R4RK1 w - 0 10",
+            "3k4/3p4/8/K1P4r/8/8/8/8 b - - 0",
+            "8/8/4k3/8/2p5/8/B2P2K1/8 w - - 1",
+            "8/8/1k6/2b5/2pP4//8 b - 0 1",
+            "5k2/8/8/8/8/8/4K2R w K - 0 1",
+            "3k4/8/8/8/8/8/8/R w Q - 0 1",
+            "r3k2r/1b4bq/8/8/8/8/7B/R3K2R w KQkq - 0 1dagsa",
+            "r3k2r/8/3Q4/8/8/5q2/8/R3K2R b KQkq - 0 1dgsha123413",
+            "2K2r2/4P3/8/8/8/8/8/3k4 w - -ewqyuio",
+            "8/8/1P2K3/8/2n5/1q6/8/5k2 b - - 0 1!!!@1241h",
+            "4k3/1P6/8/8/8/8/K7/8 w - aaaaaaa",
+            "8/P1k5/K7/8/8/8/8/8 w - - 0 1         ",
+            "K1k5/8/P7/8/8/8/8/8 w - - 1111 00000000dsaghj",
+            "8/k1P5/8/1K6/8/8/8/8",
+            "8/8/2k5/5q2/5n2/8/5K8 b - - 0 1",
+        ];
+
+        for string in fen_strings {
+            Fen::try_from(string).expect_err(string);
         }
     }
 }

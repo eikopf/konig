@@ -21,6 +21,31 @@ pub trait Board: std::fmt::Debug {
     fn get_piece_at(&self, index: Self::Index) -> Option<&Self::Piece>;
 }
 
+/// Represents a board that implements standard chess.
+///
+/// This is primarily used as a trait bound in [`Validate`]
+/// and [`Process`] to add extra methods related to ordinary
+/// chessboard representations.
+pub trait Standard: Board<Piece: Piece<Color = Self::Color>> {
+    /// The type representing the two sides of the game.
+    type Color;
+
+    /// The type representing the availability of castling
+    /// for each of the four rooks.
+    type CastlingPermissions;
+
+    /// Returns the [`Color`] corresponding to the side next to move.
+    fn side_to_move(&self) -> Self::Color;
+
+    /// Returns a [`CastlingPermissions`] denoting whether each of
+    /// the four rooks is still castleable.
+    fn castling_permissions(&self) -> Self::CastlingPermissions;
+
+    /// Returns `None` if there is no available en passant square
+    /// for capturing, and an [`Index`] if one is available.
+    fn en_passant_target_square(&self) -> Option<Self::Index>;
+}
+
 /// Represents a board which can validate candidate moves.
 ///
 /// Implementations should try to prevent their users from
