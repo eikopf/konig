@@ -5,6 +5,7 @@ use crate::io::San;
 use super::index::Index;
 use super::piece::Piece;
 use super::r#move::{IllegalMoveError, LegalMove, Move};
+use super::Algebraic;
 
 /// Represents a static view into a single board position, with
 /// no notion of moves or move legality.
@@ -32,7 +33,12 @@ pub trait Position: std::fmt::Debug {
 /// This is also a marker trait, in the sense that it constitutes
 /// a promise that this [`Position`] is part of an implementation
 /// of standard chess.
-pub trait Standard: Position<Piece: Piece<Color = Self::Color>> {
+pub trait Standard
+where
+    Self: Position,
+    Self::Index: Algebraic,
+    Self::Piece: Piece<Color = <Self as Standard>::Color>,
+{
     /// The type representing the two sides of the game.
     type Color;
 
@@ -77,7 +83,9 @@ pub trait Validate: Position {
     /// Validates the given candidate SAN move based on the current state of self.
     fn validate_san(&self, candidate: San) -> Result<Self::LegalMove, Self::ValidationError>
     where
-        Self: Standard + Sized;
+        Self: Standard + Sized,
+        Self::Index: Algebraic,
+        Self::Piece: Piece<Color = <Self as Standard>::Color>;
 }
 
 /// Represents a board which can process validated moves.

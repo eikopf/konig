@@ -85,6 +85,8 @@ impl Not for BitBoard {
     }
 }
 
+// TODO: impl utils from https://www.chessprogramming.org/Flipping_Mirroring_and_Rotating
+
 /// An [`Iterator`] over the bits of a [`BitBoard`].
 ///
 /// Using a mask instead of an index slightly reduces

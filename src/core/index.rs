@@ -1,5 +1,6 @@
 //! Traits for representing metric spaces composed of chessboard indices.
 
+use std::{ops::Add, str::FromStr};
 use thiserror::Error;
 
 /// The result of the incorrect creation or usage of
@@ -10,11 +11,41 @@ pub enum IndexError<T> {
     #[error("Received an out-of-bounds index: {0}")]
     OutOfBounds(T),
     /// The result of attempting to construct an invalid index.
-    #[error("Received an index with invalid formatting: {0}")]
+    #[error("Received an index with an invalid format: {0}")]
     InvalidFormat(T),
 }
 
+/// Represents an [`Index`] which can be derived from an
+/// algebraic notation. Standard chess implements this
+/// with a simple file character and rank digit, but other
+/// variants may have more complex systems.
+pub trait Algebraic: Index + FromStr<Err = IndexError<String>> {
+    /// The type representing the file component of the [`Index`].
+    type File;
+    /// The type representing the rank component of the [`Index`].
+    type Rank;
+
+    /// Returns the file component of the [`Index`].
+    fn file(&self) -> Self::File;
+    /// Returns the rank component of the [`Index`].
+    fn rank(&self) -> Self::Rank;
+}
+
+/// Represents an [`Index`] with an associated notion
+/// of color.
+pub trait Colored: Index {
+    /// The type of the colors which this [`Index`] may be.
+    type Color;
+
+    /// Returns the color of the [`Index`].
+    fn color(&self) -> Self::Color;
+}
+
 /// Represents a particular position on a given board.
+pub trait Index {}
+
+/// Represents an [`Index`] equipped with the structure
+/// of a metric space.
 ///
 /// ## As a Metric Space
 /// Indices on a chessboard form a set of positions equipped
@@ -23,13 +54,12 @@ pub enum IndexError<T> {
 /// On a standard board this is the Euclidean metric, whereas
 /// a hypothetical spherical chessboard has a metric given by
 /// the lengths of sections of great circles.
-pub trait Index {
+pub trait Metric: Index + Sized {
     /// The type of the distance between two indices.
     ///
-    /// The [`PartialOrd`] bound is necessary for a valid distance
-    /// metric to make coherent sense; in practice this implies
-    /// that this type will almost always be a [`usize`] or [`f64`].
-    type MetricTarget: PartialOrd;
+    /// These trait bounds are derived from the axioms
+    /// which govern the distance function on metric spaces.
+    type MetricTarget: PartialOrd + Eq + Add<Self, Output = Self::MetricTarget>;
 
     /// Computes the distance between `a` and `b`.
     ///
@@ -42,36 +72,5 @@ pub trait Index {
     /// These are the axioms which a metric space must uphold,
     /// though in general most intutitive notions of distance will
     /// already fulfil these requirements.
-    fn distance(a: Self, b: Self) -> Self::MetricTarget
-    where
-        Self: Sized;
-}
-
-/// Represents an index with a distinct per-piece
-/// notion of distance.
-///
-/// ## Per-Piece Distance
-/// Individual pieces experience the chessboard differently;
-/// in some sense they induce different (typically discrete)
-/// metrics depending on how they are permitted to move. As an example, the
-/// king's movement is described by the [Chebyshev distance](https://en.wikipedia.org/wiki/Chebyshev_distance),
-/// whereas the knight's movement has no associated analytic metric.
-pub trait PieceMetric: Index {
-    /// The set of piece kinds which this index
-    /// defines distance metrics for.
-    type PieceKind;
-
-    /// The type of the distance between two indices,
-    /// as perceived by a [`Piece`](super::Piece).
-    ///
-    /// The [`Ord`] bound is necessary for a valid distance
-    /// metric to make coherent sense; in practice this implies
-    /// that this type will almost always be a [`usize`] or [`f64`].
-    type PieceMetricTarget: PartialOrd;
-
-    /// Computes the distance between `a` and `b` from the perspective
-    /// of a piece of kind `kind`.
-    fn distance(kind: Self::PieceKind, a: Self, b: Self) -> Self::PieceMetricTarget
-    where
-        Self: Sized;
+    fn distance(a: Self, b: Self) -> Self::MetricTarget;
 }

@@ -6,8 +6,9 @@ pub mod piece;
 pub mod position;
 
 // reexported traits
+pub use index::Algebraic;
 pub use index::Index;
-pub use index::PieceMetric;
+pub use index::Metric;
 pub use piece::Piece;
 pub use position::Position;
 pub use position::Process;
