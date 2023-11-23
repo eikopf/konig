@@ -11,59 +11,58 @@ use nom::error::VerboseError;
 use nom::multi::{many_m_n, separated_list1};
 use nom::sequence::{pair, Tuple};
 use nom::{Finish, IResult, Parser};
-use thiserror::Error;
 
 /// Represents the ways in which a FEN string may be invalid.
-#[derive(Error, Debug)]
-enum ParseError {
-    /// Occurs if the first component of the FEN string is invalid.
-    #[error("invalid FEN representation of piece placement")]
-    InvalidPositionComponent,
+// #[derive(Error, Debug)]
+// enum ParseError {
+//     /// Occurs if the first component of the FEN string is invalid.
+//     #[error("invalid FEN representation of piece placement")]
+//     InvalidPositionComponent,
 
-    /// Occurs if the second component of the FEN string is invalid.
-    #[error("invalid FEN representation of the piece to move: expected 'w' or 'b'")]
-    InvalidPieceToMoveComponent,
+//     /// Occurs if the second component of the FEN string is invalid.
+//     #[error("invalid FEN representation of the piece to move: expected 'w' or 'b'")]
+//     InvalidPieceToMoveComponent,
 
-    /// Occurs if the third component of the FEN string is invalid.
-    #[error("invalid FEN representation of castling permissions")]
-    InvalidCastlingPermissionsComponent,
+//     /// Occurs if the third component of the FEN string is invalid.
+//     #[error("invalid FEN representation of castling permissions")]
+//     InvalidCastlingPermissionsComponent,
 
-    /// Occurs if the fourth component of the FEN string is invalid.
-    #[error("invalid FEN representation of the en passant target square")]
-    InvalidEnPassantTargetSquareComponent,
+//     /// Occurs if the fourth component of the FEN string is invalid.
+//     #[error("invalid FEN representation of the en passant target square")]
+//     InvalidEnPassantTargetSquareComponent,
 
-    /// Occurs if the fifth component of the FEN string is invalid.
-    #[error("invalid FEN representation of the halfmove clock")]
-    InvalidHalfmoveClockComponent,
+//     /// Occurs if the fifth component of the FEN string is invalid.
+//     #[error("invalid FEN representation of the halfmove clock")]
+//     InvalidHalfmoveClockComponent,
 
-    /// Occurs if the sixth component of the FEN string is invalid.
-    #[error("invalid FEN representation of the fullmove counter")]
-    InvalidFullmoveCounterComponent,
+//     /// Occurs if the sixth component of the FEN string is invalid.
+//     #[error("invalid FEN representation of the fullmove counter")]
+//     InvalidFullmoveCounterComponent,
 
-    /// Occurs if the FEN string has less than six fields.
-    #[error("failed to parse enough fields: a valid FEN string has 6")]
-    TooFewFields,
+//     /// Occurs if the FEN string has less than six fields.
+//     #[error("failed to parse enough fields: a valid FEN string has 6")]
+//     TooFewFields,
 
-    /// Occurs if the FEN string has more than six fields.
-    #[error("parsed too many fields: a valid FEN string has 6")]
-    TooManyFields,
+//     /// Occurs if the FEN string has more than six fields.
+//     #[error("parsed too many fields: a valid FEN string has 6")]
+//     TooManyFields,
 
-    /// Occurs if the FEN string has more than 8 ranks.
-    #[error("the piece placement field had too many ranks: a valid FEN string has 8")]
-    TooManyRanks,
+//     /// Occurs if the FEN string has more than 8 ranks.
+//     #[error("the piece placement field had too many ranks: a valid FEN string has 8")]
+//     TooManyRanks,
 
-    /// Occurs if the FEN string has less than 8 ranks.
-    #[error("the piece placement field had too few ranks: a valid FEN string has 8")]
-    TooFewRanks,
+//     /// Occurs if the FEN string has less than 8 ranks.
+//     #[error("the piece placement field had too few ranks: a valid FEN string has 8")]
+//     TooFewRanks,
 
-    /// Occurs if the FEN string doesn't end with (optional) whitespace.
-    #[error("the given FEN string did not terminate with whitespace")]
-    TrailingGarbage,
+//     /// Occurs if the FEN string doesn't end with (optional) whitespace.
+//     #[error("the given FEN string did not terminate with whitespace")]
+//     TrailingGarbage,
 
-    /// Occurs if a particular error kind cannot be ascertained.
-    #[error("an unknown error occurred while parsing a FEN string")]
-    UnknownError,
-}
+//     /// Occurs if a particular error kind cannot be ascertained.
+//     #[error("an unknown error occurred while parsing a FEN string")]
+//     UnknownError,
+// }
 
 type PieceArray = [Option<Piece>; 64];
 
@@ -169,7 +168,7 @@ struct FenBoard {
     data: Fen,
 }
 
-impl core::board::Position for FenBoard {
+impl core::Position for FenBoard {
     type Index = Square;
     type Piece = Piece;
 
@@ -178,7 +177,7 @@ impl core::board::Position for FenBoard {
     }
 }
 
-impl core::board::Standard for FenBoard {
+impl core::Standard for FenBoard {
     type Color = Color;
 
     type CastlingPermissions = CastlingPermissions;

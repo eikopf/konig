@@ -3,14 +3,32 @@ use crate::core::index::IndexError;
 use nom::{character::complete::one_of, combinator::eof, sequence::Tuple, Finish};
 use nonmax::NonMaxU8;
 
+use super::PieceKind;
+
 /// Represents a specific square on a `StandardBoard`
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub struct Square(NonMaxU8);
 
-impl core::index::Index for Square {
-    type MetricTarget = u8;
+impl core::Index for Square {
+    type MetricTarget = f64;
 
+    // literal distance on a chessboard is the Euclidean metric
     fn distance(a: Self, b: Self) -> Self::MetricTarget {
+        let c: f64 = (a.0.get() * a.0.get()).into();
+        let d: f64 = (b.0.get() * b.0.get()).into();
+        f64::sqrt(c + d)
+    }
+}
+
+impl core::PieceMetric for Square {
+    type PieceKind = PieceKind;
+
+    type PieceMetricTarget = u8;
+
+    fn distance(kind: Self::PieceKind, a: Self, b: Self) -> Self::PieceMetricTarget
+    where
+        Self: Sized,
+    {
         todo!()
     }
 }

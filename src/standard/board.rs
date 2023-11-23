@@ -100,11 +100,21 @@ impl core::Standard for Board {
 }
 
 impl core::Validate for Board {
-    type LegalMove = LegalMove;
     type Move = Move;
+    type LegalMove = LegalMove;
     type ValidationError = IllegalMoveError;
 
     fn validate(&self, candidate: Self::Move) -> Result<Self::LegalMove, Self::ValidationError> {
+        todo!()
+    }
+
+    fn validate_san(
+        &self,
+        candidate: crate::io::San,
+    ) -> Result<Self::LegalMove, Self::ValidationError>
+    where
+        Self: core::Standard + Sized,
+    {
         todo!()
     }
 }

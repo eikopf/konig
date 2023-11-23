@@ -2,7 +2,7 @@
 
 use std::error::Error;
 
-use super::{board::Validate, index::Index};
+use super::{index::Index, position::Validate};
 
 /// Represents an error which occurs during the verification
 /// of a candidate [`Move`].

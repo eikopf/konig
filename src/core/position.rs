@@ -1,5 +1,7 @@
 //! Traits for representing chessboards.
 
+use crate::io::San;
+
 use super::index::Index;
 use super::piece::Piece;
 use super::r#move::{IllegalMoveError, LegalMove, Move};
@@ -24,8 +26,12 @@ pub trait Position: std::fmt::Debug {
 /// Represents a board that implements standard chess.
 ///
 /// This is primarily used as a trait bound in [`Validate`]
-/// and [`Process`] to add extra methods related to ordinary
+/// and [`Process`] to add extra methods related to standard
 /// chessboard representations.
+///
+/// This is also a marker trait, in the sense that it constitutes
+/// a promise that this [`Position`] is part of an implementation
+/// of standard chess.
 pub trait Standard: Position<Piece: Piece<Color = Self::Color>> {
     /// The type representing the two sides of the game.
     type Color;
@@ -67,6 +73,11 @@ pub trait Validate: Position {
     >;
     /// Validates the given candidate move based on the current state of self.
     fn validate(&self, candidate: Self::Move) -> Result<Self::LegalMove, Self::ValidationError>;
+
+    /// Validates the given candidate SAN move based on the current state of self.
+    fn validate_san(&self, candidate: San) -> Result<Self::LegalMove, Self::ValidationError>
+    where
+        Self: Standard + Sized;
 }
 
 /// Represents a board which can process validated moves.
