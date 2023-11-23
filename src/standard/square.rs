@@ -57,14 +57,14 @@ impl From<Square> for usize {
     }
 }
 
-impl FromStr for Square {
-    type Err = IndexError<String>;
+// impl FromStr for Square {
+//     type Err = IndexError<String>;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Square::try_from(s)
-            .map_err(|err: IndexError<&str>| IndexError::InvalidFormat(err.to_string()))
-    }
-}
+//     fn from_str(s: &str) -> Result<Self, Self::Err> {
+//         Square::try_from(s)
+//             .map_err(|err: IndexError<&str>| IndexError::InvalidFormat(err.to_string()))
+//     }
+// }
 
 impl<'a> TryFrom<&'a str> for Square {
     type Error = IndexError<&'a str>;
