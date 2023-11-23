@@ -12,10 +12,16 @@ pub mod fen;
 mod pgn;
 
 /// Provides utilities for Standard Algebraic Notation (SAN).
-mod san;
+pub mod san;
 
 // NOTE: this is a list of standards to look at implementing after the core four
 // - FEEN: https://github.com/sashite/specs/blob/main/forsyth-edwards-expanded-notation.md
 // - X-FEN: https://en.wikipedia.org/wiki/X-FEN
 // - Shredder-FEN: https://www.chessprogramming.org/Forsyth-Edwards_Notation#Shredder-FEN
 //      - This probably requires an implementation of Chess960
+// - UCI: https://www.chessprogramming.org/UCI
+//      - This really requires a full game implementation with a playing AI first.
+// - ICCF numeric notation: https://en.wikipedia.org/wiki/ICCF_numeric_notation
+
+pub use fen::Fen;
+pub use san::San;
