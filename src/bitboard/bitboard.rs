@@ -49,6 +49,18 @@ impl BitXorAssign for BitBoard {
     }
 }
 
+impl From<u64> for BitBoard {
+    fn from(value: u64) -> Self {
+        Self(value)
+    }
+}
+
+impl From<BitBoard> for u64 {
+    fn from(value: BitBoard) -> Self {
+        value.0
+    }
+}
+
 impl FromIterator<bool> for BitBoard {
     fn from_iter<T: IntoIterator<Item = bool>>(iter: T) -> Self {
         let mut board = 0;

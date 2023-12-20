@@ -1,7 +1,5 @@
 //! A concrete implementation of standard chess.
 
-mod bitboard;
-
 /// Defines a [`Board`] and related concepts.
 pub mod board;
 
