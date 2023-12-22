@@ -16,9 +16,10 @@ pub enum IndexError<T> {
 }
 
 /// Represents an [`Index`] which can be derived from an
-/// algebraic notation. Standard chess implements this
-/// with a simple file character and rank digit, but other
-/// variants may have more complex systems.
+/// algebraic notation string. 
+///
+/// Standard chess implements this with a simple file character 
+/// and rank digit, but other variants may have more complex systems.
 pub trait Algebraic: Index + FromStr<Err = IndexError<String>> {
     /// The type representing the file component of the [`Index`].
     type File;

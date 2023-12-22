@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use crate::core;
-use crate::core::index::IndexError;
+use crate::core::IndexError;
 use nom::{character::complete::one_of, combinator::eof, sequence::Tuple, Finish};
 use nonmax::NonMaxU8;
 
@@ -51,9 +51,9 @@ impl TryFrom<usize> for Square {
     }
 }
 
-impl From<Square> for usize {
+impl From<Square> for u8 {
     fn from(value: Square) -> Self {
-        u8::from(value.0) as usize
+        u8::from(value.0)
     }
 }
 

@@ -6,13 +6,13 @@
 mod epd;
 
 /// Provides utilities for Forsyth-Edwards Notation (FEN).
-pub mod fen;
+mod fen;
 
 /// Provides utilities for Portable Game Notation (PGN).
 mod pgn;
 
 /// Provides utilities for Standard Algebraic Notation (SAN).
-pub mod san;
+mod san;
 
 // NOTE: this is a list of standards to look at implementing after the core four
 // - FEEN: https://github.com/sashite/specs/blob/main/forsyth-edwards-expanded-notation.md
@@ -23,5 +23,7 @@ pub mod san;
 //      - This really requires a full game implementation with a playing AI first.
 // - ICCF numeric notation: https://en.wikipedia.org/wiki/ICCF_numeric_notation
 
+// public reexports
 pub use fen::Fen;
+pub use fen::FEN_STARTING_POSITION;
 pub use san::San;

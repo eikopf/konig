@@ -21,7 +21,7 @@ pub trait Position: std::fmt::Debug {
 
     /// Returns the piece at the given index by reference
     /// if it exists, otherwise returns none.
-    fn get_piece_at(&self, index: Self::Index) -> Option<&Self::Piece>;
+    fn get_piece_at(&self, index: Self::Index) -> Option<Self::Piece>;
 }
 
 /// Represents a board that implements standard chess.
@@ -67,7 +67,7 @@ where
 /// opaque type.
 pub trait Validate: Position {
     /// Represents a move which may or may not be legal.
-    type Move: Move<Board = Self, Index = Self::Index>;
+    type Move: Move<Index = Self::Index>;
     /// Represents a move which has been confirmed to be legal.
     type LegalMove: LegalMove<Board = Self, Index = Self::Index>;
     /// The error created when move validation fails.
@@ -121,8 +121,8 @@ pub trait Process: Validate {
 mod tests {
     use super::*;
     use crate::standard::{
-        piece::Piece,
-        r#move::{IllegalMoveError, LegalMove, Move},
+        Piece,
+        {IllegalMoveError, LegalMove, Move},
         Board, Square,
     };
 

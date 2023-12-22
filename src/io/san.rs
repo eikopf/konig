@@ -20,7 +20,7 @@ use nom::{
     Finish, IResult, Parser,
 };
 
-use crate::standard::piece::PieceKind;
+use crate::standard::PieceKind;
 
 // #[derive(Error, Debug)]
 // enum ParseError<'a> {

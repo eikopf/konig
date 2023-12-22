@@ -17,19 +17,21 @@ pub trait IllegalMoveError: Error {
     /// The associated [`Index`] type (metric space) in which moves act.
     type Index: Index;
     /// The potentially illegal candidate moves.
-    type Move: Move<Index = Self::Index, Board = Self::Board>;
+    type Move: Move<Index = Self::Index>;
     /// The verified-legal moves.
     type LegalMove: LegalMove<Index = Self::Index, Move = Self::Move>;
 }
 
-/// Represents a (potentially illegal) move on the associated [`Validate`].
+/// Represents a (potentially illegal) move.
 ///
 /// A [`Move`] is essentially a pair of points in the metric space defined
-/// by its generic [`Index`] type parameter; the convention in [`konig`](crate) is
+/// by the associated [`Index`] type; the convention in [`konig`](crate) is
 /// to call the first point the `source` and the second point the `target`.
+///
+/// The legality of a move is a separate notion conveyed by a corresponding [`LegalMove`]
+/// implementation, which can "upgrade" a move into a legal one using an associated
+/// [`Validate`] to first check that the move does not violate a game rule.
 pub trait Move {
-    /// A [`Validate`] against which moves can be checked.
-    type Board: Validate<Index = Self::Index>;
     /// An [`Index`] metric space in which moves are considered pairs.
     type Index: Index;
 
@@ -50,9 +52,15 @@ pub trait Move {
 /// method should be considered the source of truth for "completely legal"
 /// moves within an implementation. In any other context, when receiving a
 /// [`LegalMove`], you can and *should* assume it to be valid.
+///
+/// Implementations are encouraged to use opaque types with RPIT (i.e. 
+/// `fn ... -> impl LegalMove<Move = ...>`) to guarantee a safe API; doing
+/// so prevents all extraneous details from leaking unnecessarily to consumers.
 pub trait LegalMove: Move {
+    /// A [`Validate`] against which moves can be checked.
+    type Board: Validate<Index = Self::Index>;
     /// The associated [`Move`] type of which [`LegalMove`]s are a subset.
-    type Move: Move<Index = Self::Index, Board = Self::Board>;
+    type Move: Move<Index = Self::Index>;
 }
 
 /// Crate-internal constructor trait for [`LegalMove`]s.
@@ -62,5 +70,5 @@ pub trait LegalMove: Move {
 pub(crate) trait WrapMove: LegalMove {
     /// Directly wraps a [`Move`] with a [`LegalMove`],
     /// without a validation step.
-    fn wrap(value: Self::Move) -> Self;
+    unsafe fn wrap_unchecked(value: Self::Move) -> Self;
 }

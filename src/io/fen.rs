@@ -1,5 +1,5 @@
-use crate::standard::board::CastlingPermissions;
-use crate::standard::piece::{Color, Piece};
+use crate::standard::CastlingPermissions;
+use crate::standard::{Color, Piece};
 use crate::standard::Square;
 use crate::{core, standard};
 
@@ -75,7 +75,7 @@ type PieceArray = [Option<Piece>; 64];
 ///
 /// ```
 /// use konig::io::Fen;
-/// use konig::io::fen::FEN_STARTING_POSITION;
+/// use konig::io::FEN_STARTING_POSITION;
 ///
 /// let from_string = Fen::try_from(FEN_STARTING_POSITION).unwrap();
 /// let from_default = Fen::default();
@@ -172,8 +172,8 @@ impl core::Position for FenBoard {
     type Index = Square;
     type Piece = Piece;
 
-    fn get_piece_at(&self, index: Self::Index) -> Option<&Self::Piece> {
-        self.data.pieces[usize::from(index)].as_ref()
+    fn get_piece_at(&self, index: Self::Index) -> Option<Self::Piece> {
+        self.data.pieces[u8::from(index) as usize]
     }
 }
 
@@ -207,7 +207,7 @@ impl std::ops::Index<Square> for FenBoard {
     type Output = Option<Piece>;
 
     fn index(&self, index: Square) -> &Self::Output {
-        &self.data.pieces[usize::from(index)]
+        &self.data.pieces[u8::from(index) as usize]
     }
 }
 
@@ -532,7 +532,7 @@ fn fen_literal(source: &str) -> FenResult<Fen> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{core::Position, standard::board::Board};
+    use crate::{core::Position, standard::Board};
 
     #[test]
     fn check_fen_parser_on_initial_position() {
@@ -590,7 +590,7 @@ mod tests {
         assert_eq!(
             data.into_position()
                 .get_piece_at(Square::try_from(28u8).unwrap().into()),
-            Some(&Piece::WhitePawn.into())
+            Some(Piece::WhitePawn.into())
         );
         assert_eq!(data.side_to_move, Color::Black);
         assert_eq!(data.castling_permissions, CastlingPermissions::default());
@@ -607,12 +607,12 @@ mod tests {
         assert_eq!(
             data.into_position()
                 .get_piece_at(Square::try_from(28u8).unwrap().into()),
-            Some(&Piece::WhitePawn.into())
+            Some(Piece::WhitePawn.into())
         );
         assert_eq!(
             data.into_position()
                 .get_piece_at(Square::try_from(34u8).unwrap().into()),
-            Some(&Piece::BlackPawn.into())
+            Some(Piece::BlackPawn.into())
         );
         assert_eq!(
             // check black pawn has properly moved
@@ -636,12 +636,12 @@ mod tests {
         assert_eq!(
             data.into_position()
                 .get_piece_at(Square::try_from(28u8).unwrap().into()),
-            Some(&Piece::WhitePawn.into())
+            Some(Piece::WhitePawn.into())
         );
         assert_eq!(
             data.into_position()
                 .get_piece_at(Square::try_from(34u8).unwrap().into()),
-            Some(&Piece::BlackPawn.into())
+            Some(Piece::BlackPawn.into())
         );
         assert_eq!(
             // check black pawn has properly moved
@@ -652,7 +652,7 @@ mod tests {
         assert_eq!(
             data.into_position()
                 .get_piece_at(Square::try_from(21u8).unwrap().into()),
-            Some(&Piece::WhiteKnight.into())
+            Some(Piece::WhiteKnight.into())
         );
 
         assert_eq!(data.side_to_move, Color::Black);

@@ -95,4 +95,3 @@ This representation takes up (and I am admittedly eyeballing this) 79 bytes for 
 - This is licensed under GPL-3, so I can't copy anything from the actual implementation. Still, I'm happy to agree that the Visitor pattern is the right one to use here, and I'll likely do something similar in my own PGN implementation.
 - Streaming PGN data is probably the correct move, as the data sizes can get large enough to warrant it. Rather than rolling my own, though, I'll try to use `nom`'s streaming parsers.
 - I absolutely need to provide a `Pgn` struct that someone can use to just parse an individual game, and possibly a `PgnDatabase` struct for the database files, but should I also expose `Visitor` and (some equivalent to) `BufferedReader` for allowing users to create custom implementations. I'm leaning towards yes, but it needs more attention.
-

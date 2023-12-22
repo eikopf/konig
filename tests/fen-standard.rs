@@ -17,7 +17,7 @@ fn get_piece_from_standard_board() {
     let index = Square::try_from("h1").unwrap();
     let std_board = Fen::default().to_standard_board();
 
-    assert_eq!(std_board[index], Some(Piece::WhiteRook));
+    assert_eq!(std_board.get_piece_at(index), Some(Piece::WhiteRook));
 }
 
 #[test]

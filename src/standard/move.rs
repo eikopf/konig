@@ -1,6 +1,5 @@
 use super::{board::Board, square::Square};
 use crate::core;
-use crate::core::r#move;
 use thiserror::Error;
 
 /// Results when a [`Move`] cannot be converted into a [`LegalMove`]
@@ -17,7 +16,7 @@ pub enum IllegalMoveError {
     InvalidTarget(Square),
 }
 
-impl r#move::IllegalMoveError for IllegalMoveError {
+impl core::IllegalMoveError for IllegalMoveError {
     type Board = Board;
     type Index = Square;
     type Move = Move;
@@ -39,7 +38,6 @@ pub struct Move {
 pub struct LegalMove(Move);
 
 impl core::Move for Move {
-    type Board = Board;
     type Index = Square;
 
     fn source(&self) -> Self::Index {
@@ -52,7 +50,6 @@ impl core::Move for Move {
 }
 
 impl core::Move for LegalMove {
-    type Board = Board;
     type Index = Square;
 
     fn source(&self) -> Self::Index {
@@ -65,11 +62,12 @@ impl core::Move for LegalMove {
 }
 
 impl core::LegalMove for LegalMove {
+    type Board = Board;
     type Move = Move;
 }
 
-impl r#move::WrapMove for LegalMove {
-    fn wrap(value: Self::Move) -> Self {
+impl core::WrapMove for LegalMove {
+    unsafe fn wrap_unchecked(value: Self::Move) -> Self {
         Self(value)
     }
 }

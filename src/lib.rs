@@ -7,6 +7,7 @@
 #![feature(associated_type_bounds)]
 #![feature(impl_trait_in_assoc_type)]
 #![feature(portable_simd)]
+#![feature(slice_as_chunks)]
 #![feature(slice_flatten)]
 
 pub mod bitboard;
