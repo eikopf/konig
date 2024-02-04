@@ -1,12 +1,7 @@
-use crate::{
-    bitboard::{
-        NibbleDecode, 
-        NibbleDecodingError, 
-        NibbleEncode, 
-        QuadBoard
-    },
-    core,
-};
+use halfling::Nibble;
+
+use crate::quadboard::{QuadBoard, EmptyNibble, NibbleEncode};
+use crate::core;
 
 /// Represents the standard set of chess pieces.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -119,6 +114,12 @@ impl core::Piece for Piece {
     }
 }
 
+// TODO: refactor quadboard impls to use a newtype
+
+impl EmptyNibble for Option<Piece> {
+    const EMPTY: Nibble = unsafe { Nibble::new_unchecked(0b0000) };
+}
+
 impl From<[Option<Piece>; 64]> for QuadBoard<Option<Piece>> {
     fn from(value: [Option<Piece>; 64]) -> Self {
         let mut qb = QuadBoard::empty();
@@ -168,61 +169,6 @@ impl Into<char> for Piece {
             Self::WhiteBishop => 'B',
             Self::WhiteQueen => 'Q',
             Self::WhiteKing => 'K',
-        }
-    }
-}
-
-impl NibbleEncode for Option<Piece> {
-    fn encode(self) -> u8 {
-        match self {
-            None => 0b0000,
-            Some(piece) => match piece {
-                Piece::BlackPawn => 0b0001,
-                Piece::BlackRook => 0b0010,
-                Piece::BlackKnight => 0b0011,
-                Piece::BlackBishop => 0b0100,
-                Piece::BlackQueen => 0b0101,
-                Piece::BlackKing => 0b0110,
-                Piece::WhitePawn => 0b1001,
-                Piece::WhiteRook => 0b1010,
-                Piece::WhiteKnight => 0b1011,
-                Piece::WhiteBishop => 0b1100,
-                Piece::WhiteQueen => 0b1101,
-                Piece::WhiteKing => 0b1110,
-            },
-        }
-    }
-}
-
-impl NibbleDecode for Option<Piece> {
-    fn decode(value: u8) -> Result<Self, NibbleDecodingError> {
-        // reject values whose upper nibble is nonzero
-        if value >= 16 {
-            return Err(NibbleDecodingError::TooLarge(value));
-        };
-
-        match value {
-            // explicitly reject undefined constants
-            0b1000 | 0b1111 | 0b0111 => Err(NibbleDecodingError::Undefined(value)),
-            // null case
-            0b0000 => Ok(None),
-            // non-null cases
-            _ => Ok(Some(match value {
-                0b0001 => Piece::BlackPawn,
-                0b0010 => Piece::BlackRook,
-                0b0011 => Piece::BlackKnight,
-                0b0100 => Piece::BlackBishop,
-                0b0101 => Piece::BlackQueen,
-                0b0110 => Piece::BlackKing,
-                0b1001 => Piece::WhitePawn,
-                0b1010 => Piece::WhiteRook,
-                0b1011 => Piece::WhiteKnight,
-                0b1100 => Piece::WhiteBishop,
-                0b1101 => Piece::WhiteQueen,
-                0b1110 => Piece::WhiteKing,
-                // all nibbles are handled at this point
-                _ => unreachable!(),
-            })),
         }
     }
 }

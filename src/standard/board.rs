@@ -4,7 +4,7 @@ use super::{
     Square,
 };
 use crate::{
-    bitboard::{NibbleDecode, QuadBoard},
+    quadboard::QuadBoard,
     core,
     core::Position,
     io::Fen,
@@ -77,8 +77,7 @@ impl core::Position for Board {
     type Piece = Piece;
 
     fn get_piece_at(&self, index: Self::Index) -> Option<Self::Piece> {
-        let piece: u8 = unsafe { self.pieces.get_unchecked(u8::from(index)) };
-        Option::<Piece>::decode(piece).unwrap()
+        todo!()
     }
 }
 
@@ -188,18 +187,7 @@ impl<'a> Iterator for BoardIterator<'a> {
     type Item = Option<<Board as Position>::Piece>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.index == 64 {
-            None
-        } else {
-            let result = self
-                .board
-                .pieces
-                .read(self.index.try_into().unwrap())
-                .unwrap();
-
-            self.index += 1;
-            Some(result)
-        }
+        todo!()
     }
 }
 
@@ -248,10 +236,11 @@ impl DoubleEndedIterator for BoardRankIterator {
 
 impl From<Board> for BoardRankIterator {
     fn from(value: Board) -> Self {
-        Self {
-            board: value.pieces.into_array(),
-            index: 0,
-        }
+        //Self {
+        //    board: value.pieces.into_array(),
+        //    index: 0,
+        //}
+        todo!()
     }
 }
 

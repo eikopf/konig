@@ -1,4 +1,4 @@
-//! Abstract traits for implementing chess and chess variants.
+//! Traits for implementing chess and chess variants.
 
 mod index;
 mod r#move;
