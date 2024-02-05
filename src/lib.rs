@@ -3,7 +3,6 @@
 
 // lints
 #![warn(missing_docs)]
-
 // nightly features
 #![feature(never_type)]
 #![feature(associated_type_bounds)]
